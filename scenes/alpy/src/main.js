@@ -116,6 +116,10 @@ const state = {
   wx: null,
   // Blesk: čas výboje, body kanálu, další výboj.
   strikeAt: -100,
+  // Padající hvězda: kdy začala, pořadí, kdy přiletí další.
+  meteorAt: -100,
+  meteorSeed: 0,
+  nextMeteor: 20,
   bolt: new Float32Array(24),
   nextStrike: 3,
   stormUntil: -1,
@@ -349,6 +353,13 @@ function simulate(dt) {
   state.cloudShift[0] -= Math.sin(toward) * wind * dt;
   state.cloudShift[1] -= Math.cos(toward) * wind * dt;
   const snow = state.wx.snow;
+  // Padající hvězdy za jasné noci: průměrně jednou za půldruhé minuty.
+  state.nextMeteor -= dt;
+  if (state.nextMeteor <= 0) {
+    state.meteorAt = state.time;
+    state.meteorSeed = (state.meteorSeed + 1) % 997;
+    state.nextMeteor = 30 + random() * 120;
+  }
   // Bouřka: výboje v náhodných odstupech, každý dva až tři záblesky za sebou.
   state.nextStrike -= dt;
   if (state.nextStrike <= 0 && (state.wx.storm > 0.5 || state.time < state.stormUntil)) {
@@ -364,7 +375,7 @@ function simulate(dt) {
   // Ptáci létají jen ve dne.
   // Soumrak (slunce nízko na západě): kavky letí na nocoviště do lesa.
   const dusk = current.sun[1] < 0.15 && current.sun[0] < 0;
-  birds.step(dt, pointer, current.sun[1] > 0.02, dusk);
+  birds.step(dt, pointer, current.sun[1] > 0.02, dusk, current.sun[1] < -0.12);
 
   // Krajina se s kurzorem nehýbe; na kurzor reagují jen ptáci.
 }
@@ -409,6 +420,8 @@ function render() {
     mist: config.mlha * state.wx.mist * (current.season.mist / 0.45) * (1 - 0.8 * Math.min(1, Math.max(0, (s - 0.05) / 0.3)) + 1.3 * dawn),
     ice: current.season.ice, snowfall: state.snowfall,
     overcast: state.wx.overcast, rain: state.wx.rain * (current.season.ice > 0.7 ? 0 : 1),
+    hour: current.date.getHours() + current.date.getMinutes() / 60,
+    meteor: { seed: state.meteorSeed, age: time - state.meteorAt },
     flash: flashAt(time - state.strikeAt) * (0.5 + 0.5 * (1 - Math.max(0, current.sun[1]) * 2)),
     bolt: state.bolt, boltAlpha: flashAt(time - state.strikeAt) > 0.05 ? Math.min(1, flashAt(time - state.strikeAt) * 1.5) : 0,
     sun: current.sun, moon: current.moon, moonPhase: current.moonPhase,

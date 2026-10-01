@@ -2,7 +2,9 @@
 // dvojitý klín, J, šikmá řada, šňůra, volné hejno kavek, kroužící káně) s náhodným
 // počtem, rozestupy a úhlem ramen. Každý pták drží své místo ve formaci pružinou.
 // Před kurzorem se ptáci rozprchnou a pak se zase srazí dohromady; občas jeden vyplašený
-// prolétne těsně kolem kamery. Za soumraku se kavky stahují na nocoviště do lesa.
+// prolétne těsně kolem kamery. Za soumraku se kavky stahují na nocoviště do lesa,
+// v noci občas tiše přeplachtí nad jezerem sova. Při 30 snímcích za sekundu se rychlí
+// ptáci kreslí s lehkým rozmazáním pohybem (stopa za nimi), ať neposkakují.
 // Kreslí se jako tmavé siluety s mávajícími křídly, simulace běží s pevným krokem 1/60 s.
 
 import { createProgram } from '../../shared/gl.js';
@@ -79,12 +81,13 @@ export function createBirds(gl, { config, random }) {
   const program = createProgram(gl, VS, FS, 'birds');
   const vao = gl.createVertexArray();
   const buffer = gl.createBuffer();
-  const data = new Float32Array(MAX_BIRDS * FLOATS);
+  const data = new Float32Array(MAX_BIRDS * 2 * FLOATS);
   const birds = [];
   const flocks = [];
   let view = [1, 1];
   let next = config.ptaci.prvni;
   let closeCooldown = 0;   // pták u oka nejvýš jednou za čas
+  let nextOwl = 40;
 
   gl.bindVertexArray(vao);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -190,9 +193,14 @@ export function createBirds(gl, { config, random }) {
     }
   }
 
-  function step(dt, pointer, allowNew = true, dusk = false) {
+  function step(dt, pointer, allowNew = true, dusk = false, night = false) {
     next -= dt;
     closeCooldown -= dt;
+    nextOwl -= dt;
+    if (night && nextOwl <= 0 && flocks.length < MAX_FLOCKS) {
+      owl();
+      nextOwl = 90 + random() * 180;
+    }
     if (next <= 0 && allowNew) {
       // Za soumraku hlavně kavky na cestě na nocoviště.
       flock(false, dusk && random() < 0.7);
@@ -233,6 +241,15 @@ export function createBirds(gl, { config, random }) {
     for (const b of birds) {
       let ax = 0, ay = 0;
       const f = b.flock;
+      if (f.kind === 'sova') {
+        // Plachtí po mírném oblouku, jen občas několikrát mávne.
+        b.vy = Math.sin(b.age * 0.35) * 8;
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.age += dt;
+        b.phase += dt * b.rate * (Math.sin(b.age * 0.6) > 0.55 ? 1 : 0.05);
+        continue;
+      }
       if (f.kind === 'blizko') {
         // Pták u oka letí rovně pryč, jen mírně stoupá.
         b.vy += 20 * dt;
@@ -304,6 +321,18 @@ export function createBirds(gl, { config, random }) {
     }
   }
 
+  // Sova: jediný velký pták nízko nad jezerem, pomalu mává a dlouho plachtí.
+  function owl() {
+    const [w, h] = view;
+    const heading = random() < 0.5 ? 1 : -1;
+    const f = { kind: 'sova', heading, depth: 1, count: 1, drift: 0, x: heading > 0 ? -60 : w + 60, y: h * (0.36 + random() * 0.12) };
+    flocks.push(f);
+    birds.push({
+      flock: f, slot: [0, 0], wander: 0, x: f.x, y: f.y, vx: heading * 70, vy: 0,
+      phase: 0, rate: 3.2, size: 16 + random() * 4, alpha: 0.95, age: 0, scared: 0,
+    });
+  }
+
   // Pták u oka: velký, blízko, rychle mává a uletí z obrazovky.
   function closeBird(from, dx, dy) {
     if (birds.length >= MAX_BIRDS) return;
@@ -328,10 +357,10 @@ export function createBirds(gl, { config, random }) {
       if (!birds.length) return;
       let n = 0;
       for (const b of birds) {
-        if (n >= MAX_BIRDS) break;
+        if (n >= MAX_BIRDS * 2 - 1) break;
         // Mávání: klouzání střídá rychlé údery křídel. Formace občas společně plachtí,
         // dravec plachtí skoro pořád.
-        const soar = b.flock.kind === 'dravec';
+        const soar = b.flock.kind === 'dravec' || b.flock.kind === 'sova';
         const glide = b.scared > 0 ? 0 : soar
           ? Math.min(1, Math.max(0, (Math.sin(b.age * 0.3) + 0.7) * 3))
           : Math.min(1, Math.max(0, (Math.sin(b.age * 0.45 + b.flock.drift) - 0.55) * 3));
@@ -341,7 +370,13 @@ export function createBirds(gl, { config, random }) {
         const y = b.py === undefined ? b.y : b.py + (b.y - b.py) * blend;
         const tilt = Math.max(-0.5, Math.min(0.5, Math.atan2(b.vy, Math.abs(b.vx)) * 0.5 * Math.sign(b.vx)));
         const fade = Math.min(1, b.age / 0.5) * (1 - (b.vanish || 0));
-        data.set([x * dpr, y * dpr, b.size * dpr, flap, tilt, b.alpha * fade], n * FLOATS);
+        // Rozmazání pohybem: slabší kopie o půl snímku (1/60 s) zpět po dráze letu.
+        const speed = Math.hypot(b.vx, b.vy);
+        if (speed > 60 && n < MAX_BIRDS * 2 - 1) {
+          data.set([(x - b.vx / 60) * dpr, (y - b.vy / 60) * dpr, b.size * dpr, flap, tilt, b.alpha * fade * 0.35], n * FLOATS);
+          n++;
+        }
+        data.set([x * dpr, y * dpr, b.size * dpr, flap, tilt, b.alpha * fade * (speed > 60 ? 0.8 : 1)], n * FLOATS);
         n++;
       }
       gl.useProgram(program.program);

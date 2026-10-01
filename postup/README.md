@@ -344,3 +344,21 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Noc: odraz balvanů navazuje na hladinu bez světlé mezery (výřez zesvětlený 3,5×)](57-noc-odraz-balvanu-navazuje-na-hladinu-be.jpg)
 
+## 58. Svítání: přízemní mlha nad jezerem, okno chaty, odlesk lucerny ve vodě
+
+*2026-10-01 08:30*
+
+![Svítání: přízemní mlha nad jezerem, okno chaty, odlesk lucerny ve vodě](58-svitani-prizemni-mlha-nad-jezerem-okno-c.jpg)
+
+## 59. Měsíční noc nad Gosau (zesvětleno 3×)
+
+*2026-10-01 08:20*
+
+![Měsíční noc nad Gosau (zesvětleno 3×)](59-mesicni-noc-nad-gosau-zesvetleno-3.jpg)
+
+## 60. Blízké smrky s objemem koruny (zvětšeno 2×)
+
+*2026-10-01 08:00*
+
+![Blízké smrky s objemem koruny (zvětšeno 2×)](60-blizke-smrky-s-objemem-koruny-zvetseno-2.jpg)
+

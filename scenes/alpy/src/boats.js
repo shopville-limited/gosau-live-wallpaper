@@ -44,7 +44,8 @@ void main() {
   vec2 c = CORNERS[gl_VertexID];
   // Obdélník kolem loďky: délka v pohledu + rezerva na pádla, vesla a prut.
   float halfWidth = aShape.x * 0.5 + 2.2;
-  float y = mix(-0.5, 3.0, c.y);
+  // Odraz rozsvícené lucerny se táhne po vodě daleko k oku: delší obdélník.
+  float y = mix(-0.5, aScreen.w > 0.5 && aMotion.z > 0.0 ? 10.0 : 3.0, c.y);
   vShape = aShape;
   vMotion = aMotion;
   vHull = aColor.rgb;
@@ -429,24 +430,40 @@ void main() {
     c *= mix(0.6, 1.0, smoothstep(0.0, 0.12, p.y));
   }
   // Lucerna na přídi Plätte za soumraku a v noci.
+  float lanternLight = 0.0;
+  vec3 lanternColor = vec3(0.0);
   if (lantern > 0.0) {
     vec3 L = vec3(3.55, 1.25, 0.0);
     float along = max(dot(L - ro, dir), 0.0);
-    float dl = length(ro + dir * along - L);
+    vec3 off = ro + dir * along - L;
+    if (mirror) {
+      // Na vlnkách se světlo protáhne do svislého třpytivého sloupce až k loďce.
+      off.y *= 0.12;
+      off.x *= 0.7 + 0.3 * sin(gl_FragCoord.y * 1.7 + uTime * 6.0);
+    }
+    float dl = length(off);
     float core = 1.0 - smoothstep(0.08, 0.14, dl);
     float glow = exp(-dl * dl * 2.5) * lantern;
-    c = mix(c, vec3(4.0, 2.4, 1.0), core * lantern);
-    c += vec3(1.0, 0.6, 0.25) * glow * 0.8;
-    cover = max(cover, max(core * lantern, glow * 0.6));
+    if (mirror) {
+      float sparkle = 0.55 + 0.45 * sin(gl_FragCoord.y * 2.3 + uTime * 9.0) * sin(gl_FragCoord.y * 0.7 - uTime * 4.0);
+      lanternLight = (core * 0.8 + glow * 0.5) * lantern * sparkle;
+      lanternColor = vec3(1.0, 0.6, 0.25) * 2.2;
+    } else {
+      c = mix(c, vec3(4.0, 2.4, 1.0), core * lantern);
+      c += vec3(1.0, 0.6, 0.25) * glow * 0.8;
+      cover = max(cover, max(core * lantern, glow * 0.6));
+    }
   }
   // Vzduch: vzdálené loďky splývají s oparem.
   float haze = 1.0 - exp(-vMotion.w * 0.2);
   c = mix(c, skyColor(vec3(0.0, 0.02, 1.0)) * 0.9, haze);
   float alpha = cover * vMotion.y;
   if (mirror) {
-    // Odraz: tmavší, u hladiny nejsilnější.
+    // Odraz: tmavší, u hladiny nejsilnější; odlesk lucerny zvlášť (sahá dál).
     alpha *= 0.55 * (1.0 - smoothstep(0.0, 2.2, p.y));
     c *= 0.65;
+    c = (c * alpha + lanternColor * lanternLight) / max(alpha + lanternLight * 0.5, 1e-4);
+    alpha = min(1.0, alpha + lanternLight * 0.5);
   }
   if (alpha < 0.003) discard;
   c = aces(c * uExposure);

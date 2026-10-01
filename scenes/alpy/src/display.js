@@ -47,6 +47,9 @@ uniform float uMist;
 uniform float uIce;              // zamrzlé jezero 0..1
 uniform float uSnowfall;         // sněžení 0..1
 uniform float uRain;             // déšť 0..1
+uniform float uHour;             // místní čas v hodinách (0–24)
+uniform float uMeteorSeed;       // pořadí padající hvězdy (mění se s každou novou)
+uniform float uMeteorAge;        // s od začátku letu padající hvězdy (0..1,2 = letí)
 uniform float uRealStars;        // 1 = hvězdy z katalogu (stars.js), vymyšlené se nekreslí
 uniform mat3 uGalactic;          // svět → galaktické souřadnice (Mléčná dráha)
 uniform vec2 uBolt[12];          // kanál blesku v souřadnicích obrazovky (0..1), 12 bodů
@@ -197,8 +200,29 @@ vec4 cloudMarch(vec3 rd) {
   return vec4(clouds, transmit);
 }
 
+// Padající hvězda: krátká čára, která se rozsvítí, přeletí a zhasne (na obloze i v odrazu).
+vec3 meteor(vec2 uv) {
+  if (uMeteorAge < 0.0 || uMeteorAge > 1.2) return vec3(0.0);
+  float night = 1.0 - smoothstep(-0.18, -0.08, uSun.y);
+  if (night <= 0.0) return vec3(0.0);
+  vec2 h = hash22(vec2(uMeteorSeed, 7.1));
+  vec2 start = vec2(0.15 + 0.7 * h.x, uHorizon + 0.35 + 0.5 * (1.0 - uHorizon) * h.y);
+  vec2 dir = normalize(vec2(h.x < 0.5 ? 1.0 : -1.0, -0.45 - 0.4 * h.y));
+  float aspect = uPixels.x / uPixels.y;
+  float speed = 0.45;
+  float head = uMeteorAge * speed;
+  vec2 q = (uv - start) * vec2(aspect, 1.0);
+  float along = dot(q, dir);
+  float side = abs(q.x * dir.y - q.y * dir.x);
+  float tail = 0.12;
+  float onTrail = step(head - tail, along) * step(along, head);
+  float fade = smoothstep(0.0, 0.15, uMeteorAge) * (1.0 - smoothstep(0.7, 1.2, uMeteorAge));
+  float glow = exp(-side * side * 3.0e6) * onTrail * smoothstep(head - tail, head, along);
+  return vec3(0.9, 0.95, 1.0) * glow * fade * night * 1.6;
+}
+
 vec3 skyWithClouds(vec3 rd, vec2 uv) {
-  vec3 sky = skyColor(rd) + moonDisk(rd);
+  vec3 sky = skyColor(rd) + moonDisk(rd) + meteor(uv) * (1.0 - uOvercast);
   if (rd.y <= 0.004) return sky;
   // Rozmazané čtení (9 bodů, Gauss): textura mraků má čtvrtinové rozlišení a posun kroků.
   vec2 px = 1.0 / vec2(textureSize(uClouds, 0));
@@ -333,7 +357,19 @@ vec3 litTerrain(vec2 uv, Material m, vec3 rd, float t) {
   c += vec3(0.45, 0.10, 0.16) * m.snow * diffuse * sunShadow * glow;
   // Okna vesnice se rozsvítí za soumraku.
   float evening = 1.0 - smoothstep(-0.02, 0.07, uSun.y);
-  c += vec3(1.0, 0.60, 0.26) * m.lights * evening * 4.0;
+  // Okno chaty: svítí za soumraku, kolem 22. hodiny zhasne (chata spí), před svítáním
+  // se rozsvítí (horolezci vstávají brzy) a za světla zhasne.
+  float awake = 1.0 - smoothstep(21.8, 22.2, uHour) * (1.0 - smoothstep(4.3, 4.6, uHour));
+  c += vec3(1.0, 0.60, 0.26) * m.lights * evening * awake * 4.0;
+  // Ranní rosa: na trávě a loukách blízko kamery se v nízkém ranním slunci třpytí kapky.
+  float morning = smoothstep(5.0, 6.5, uHour) * (1.0 - smoothstep(9.0, 10.5, uHour));
+  if (morning > 0.0 && t < 0.6 && m.snow < 0.5 && m.forest < 0.3 && n.y > 0.75) {
+    vec2 cell = floor(gl_FragCoord.xy * 0.5);
+    float h = hash12(cell + floor(uTime * 0.7) * 0.0 + 17.0);
+    float twinkle = 0.5 + 0.5 * sin(uTime * (2.0 + 5.0 * hash12(cell + 3.0)) + h * 40.0);
+    float dew = step(0.985, h) * twinkle * morning * (1.0 - smoothstep(0.2, 0.6, t));
+    c += sunLight() * sunShadow * dew * 0.6 * smoothstep(0.0, 0.06, uSun.y);
+  }
 
   // Vzdušná perspektiva: vzdálené hory modrají a mizí v oparu.
   // Dva druhy: modrý rozptyl (Rayleigh) roste se vzdáleností hodně, bílý opar (Mie)
@@ -743,6 +779,25 @@ void main() {
     // Balvan nad vodou (3D, v hloubkové mapě terénu je tam hladina): vzdálenost hladiny.
     else if (a < 0.0 && rd.y < 0.0) sceneDist = CAMERA_HEIGHT / -rd.y;
   }
+  // Přízemní mlha nad jezerem: v noci tenká vrstva, která se pomalu převaluje nad
+  // hladinou, za svítání zhoustne a s prvním sluncem stoupá a rozpouští se.
+  float nightFog = 1.0 - smoothstep(-0.05, 0.02, uSun.y);
+  float dawnFog = smoothstep(4.5, 6.0, uHour) * (1.0 - smoothstep(7.5, 9.5, uHour));
+  float fogAmount = clamp(uMist, 0.0, 2.0) * max(nightFog * 0.7, dawnFog * 1.2);
+  if (fogAmount > 0.01 && sceneDist > 0.15) {
+    // Vrstva leží nízko nad hladinou (asi 15 m, za svítání stoupá), jen tam, kde bod
+    // scény opravdu je nízko: ne přes stromy a skály na svazích.
+    vec3 Pf = vec3(0.0, CAMERA_HEIGHT, 0.0) + rd * min(sceneDist, 12.0);
+    float rise = dawnFog * smoothstep(-0.02, 0.15, uSun.y) * 0.02;
+    float layer = exp(-max(Pf.y - rise, 0.0) / (0.012 + 0.015 * dawnFog));
+    vec2 fq = Pf.xz * 1.6 + vec2(uTime * 0.004, uTime * 0.0015);
+    float wisps = smoothstep(0.3, 0.8, texture(uNoise, fq).r * 0.65 + texture(uNoise, fq * 2.9 + 0.3).r * 0.35);
+    vec3 zenith, horizon;
+    palette(uSun.y, zenith, horizon);
+    vec3 fogColor = horizon * 0.75 + mix(zenith, horizon, 0.5) * 0.25 + sunLight() * 0.08 + moonLight() * 0.6;
+    float depthFade = 1.0 - exp(-max(sceneDist - 0.15, 0.0) * 0.9);
+    c = mix(c, fogColor, clamp(layer * wisps * fogAmount * depthFade * 0.7, 0.0, 0.8));
+  }
   c = snowScene(c, gl_FragCoord.xy, sceneDist);
   c = rainScene(c, gl_FragCoord.xy, sceneDist);
   // Záře kolem jasných míst (sníh na slunci, měsíc, lucerny, okna) jako v objektivu.
@@ -887,6 +942,9 @@ export function createDisplay(gl) {
       gl.uniform1f(u.uIce, o.ice);
       gl.uniform1f(u.uSnowfall, o.snowfall);
       gl.uniform1f(u.uRain, o.rain || 0);
+      gl.uniform1f(u.uHour, o.hour ?? 12);
+      gl.uniform1f(u.uMeteorSeed, o.meteor ? o.meteor.seed : 0);
+      gl.uniform1f(u.uMeteorAge, o.meteor ? o.meteor.age : -1);
       gl.uniform1f(u.uRealStars, o.stars && o.stars.ready ? 1 : 0);
       if (u.uGalactic && o.sky) gl.uniformMatrix3fv(u.uGalactic, false, o.sky.worldToGalactic);
       gl.uniform1f(u.uOvercast, o.overcast || 0);

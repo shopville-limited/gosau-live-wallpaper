@@ -76,5 +76,7 @@ export function createWeather({ latitude, longitude, enabled, override = null })
       return data && Date.now() - fetchedAt < STALE ? data : null;
     },
     get simulated() { return Boolean(override); },
+    /** Náhled: přepnout na simulované počasí (údaje jako z Open-Meteo), nebo null = skutečné. */
+    setOverride(value) { override = value; },
   };
 }

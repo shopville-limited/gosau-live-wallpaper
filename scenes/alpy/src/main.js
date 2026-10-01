@@ -143,6 +143,7 @@ let world = null;
 const urlHour = params.has('hodina') ? Number(params.get('hodina')) : null;
 const urlMonth = params.has('mesic') ? Number(params.get('mesic')) : null;
 const urlDay = params.has('den') ? Math.min(31, Math.max(1, Math.round(Number(params.get('den'))) || 15)) : 15;
+let dayOfMonth = urlDay;   // náhled: den v měsíci (posuvník), jen spolu se zvoleným měsícem
 const clock = {
   hour: Number.isFinite(urlHour) ? urlHour : config.cas.rezim === 'pevny' ? config.cas.hodina : null,
   month: Number.isFinite(urlMonth) ? Math.min(12, Math.max(1, urlMonth))
@@ -161,10 +162,10 @@ function currentDate() {
   let date = new Date();
   if (clock.speed !== 1 && clock.anchor) {
     date = new Date(clock.anchor.virtual + (Date.now() - clock.anchor.real) * clock.speed);
-    if (clock.month !== null) date.setMonth(clock.month - 1, urlDay);
+    if (clock.month !== null) date.setMonth(clock.month - 1, dayOfMonth);
     return date;
   }
-  if (clock.month !== null) date.setMonth(clock.month - 1, urlDay);
+  if (clock.month !== null) date.setMonth(clock.month - 1, dayOfMonth);
   if (clock.hour !== null) date.setHours(Math.floor(clock.hour), Math.round((clock.hour % 1) * 60), 0, 0);
   return date;
 }
@@ -582,6 +583,37 @@ if (inApp) {
     clock.month = v;
     loop.invalidate();
   });
+  // Den v měsíci (fáze měsíce, novoluní pro Mléčnou dráhu); posune i měsíc na zvolený.
+  const day = slider('Den', 1, 31, 1, dayOfMonth, (v) => {
+    dayOfMonth = v;
+    if (clock.month === null) clock.month = currentDate().getMonth() + 1;
+    day.output.value = String(v);
+    loop.invalidate();
+  });
+  day.output.value = String(dayOfMonth);
+  // Počasí: skutečné z Open-Meteo, nebo simulované (stejné údaje jako ?pocasi=...).
+  const PRESETS = {
+    'Skutečné (Gosau)': null,
+    'Jasno': 'nizka:0,stredni:0,vysoka:0,vitr:2',
+    'Polojasno': 'nizka:35,stredni:10,vysoka:30,vitr:3',
+    'Cirry (vysoká oblačnost)': 'nizka:5,vysoka:100,vitr:2',
+    'Zataženo': 'nizka:85,stredni:90,vitr:4',
+    'Déšť': 'nizka:90,stredni:95,srazky:3,teplota:12,vitr:6',
+    'Přeháňka s duhou': 'nizka:40,stredni:10,srazky:0.6,teplota:10,kod:80,vitr:5',
+    'Bouřka': 'nizka:80,stredni:90,srazky:6,teplota:18,vitr:10,naraz:20,kod:95',
+    'Sněžení': 'nizka:80,stredni:80,snih:1.5,srazky:1.5,teplota:-3,vitr:3',
+    'Mlha': 'nizka:100,viditelnost:600,kod:45,vitr:1',
+    'Silný vítr': 'nizka:30,vysoka:40,vitr:14,naraz:24',
+  };
+  const weatherWrap = document.createElement('label');
+  const weatherSelect = document.createElement('select');
+  for (const name of Object.keys(PRESETS)) weatherSelect.append(new Option(name, name));
+  weatherSelect.addEventListener('change', () => {
+    weather.setOverride(weatherFromUrl(PRESETS[weatherSelect.value]));
+    state.wx = null;   // nové počasí hned, bez pomalého přechodu
+    loop.invalidate();
+  });
+  weatherWrap.append('Počasí', weatherSelect);
   // Panel Nastavení: posuvníky mění nastavení scény za běhu (jen v náhledu, neukládá se;
   // trvale se nastavuje v config.js).
   const settings = document.createElement('details');
@@ -649,8 +681,10 @@ if (inApp) {
       { label: 'Poryv větru', key: 'V', action: actions.vitr },
       { label: 'Přehrát den', key: 'D', action: actions.den },
       { label: 'Sněžení', key: 'S', action: actions.sneh },
+      { label: 'Bouřka', key: 'B', action: actions.boure },
+      { label: 'Kavky na nocoviště', key: 'K', action: actions.kavky },
     ],
-    extras: [hour.wrap, month.wrap, settings],
+    extras: [hour.wrap, month.wrap, day.wrap, weatherWrap, settings],
     onPause: (paused) => { state.paused = paused; applyRate(); },
   });
 }

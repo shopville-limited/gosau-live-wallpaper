@@ -549,7 +549,7 @@ vec3 waterColor(vec3 rd, float dist) {
   float amount = (uRipple * mix(1.5, 0.15, calm) + paws * 2.5) * (1.0 - 0.95 * smoothstep(0.5, 0.85, uIce));  // led se nevlní
   vec2 slope = (vec2(ax - a0, az - a0) + 0.6 * vec2(bx - b0, bz - b0)) / e * 0.0011 * amount;
   // Brázdy loděk: blízko výrazné, dál splývají.
-  if (dist < 2.5) {
+  if (dist < 2.5 && uIce < 0.5) {   // na ledu žádné brázdy
     float k = 0.0004;
     float w0 = wakeHeight(P.xz);
     slope += vec2(wakeHeight(P.xz + vec2(k, 0.0)) - w0, wakeHeight(P.xz + vec2(0.0, k)) - w0) / k * 0.00009 / (1.0 + dist * 3.0);

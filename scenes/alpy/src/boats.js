@@ -675,7 +675,9 @@ export async function createBoats(gl, { map, random, config }) {
     /** Brázdy pro vodní shader: x, z (km), kurz, rychlost (km/s). */
     wakes() {
       wakes.fill(0);
-      boats.slice(0, MAX_BOATS).forEach((b, i) => wakes.set([b.x, b.z, b.heading, b.speed * b.fade], i * 4));
+      // Brázdu dělá jen to, co pluje po vodě (bruslaři na ledu ne), viditelné na hladině.
+      boats.filter((b) => b.kind !== 'bruslar' && b.fade > 0.01).slice(0, MAX_BOATS)
+        .forEach((b, i) => wakes.set([b.x, b.z, b.heading, b.speed * b.fade], i * 4));
       return wakes;
     },
     draw({ world, pixels, exposure, contrast, sun, moon, moonPhase, time, shadow, overcast = 0, flash = 0 }) {

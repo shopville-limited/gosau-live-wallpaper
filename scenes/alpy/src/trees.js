@@ -647,6 +647,10 @@ export function createTrees(gl, { map, random }) {
       gl.bindVertexArray(null);
       gl.disable(gl.BLEND);
       gl.uniform1f(u.uReflect, 0);
+      gl.uniform1i(u.uScene, 0);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.activeTexture(gl.TEXTURE0);
       gl.bindSampler(0, null);
       gl.bindSampler(2, null);
     },
@@ -674,6 +678,10 @@ export function createTrees(gl, { map, random }) {
       gl.uniform2f(u.uPixels, o.pixels[0], o.pixels[1]);
       gl.uniform1f(u.uTime, o.time);
       gl.uniform1f(u.uGust, o.gust);
+      // Odraz používá texturu obrazu scény; do ní se teď kreslí, nesmí na ni ukazovat
+      // žádný sampler (jinak prohlížeč kreslení odmítne a stromy zmizí).
+      gl.uniform1f(u.uReflect, 0);
+      gl.uniform1i(u.uScene, 0);
       gl.uniform3f(u.uSun, ...o.sun);
       gl.uniform3f(u.uMoon, ...o.moon);
       gl.uniform1f(u.uMoonPhase, o.moonPhase);
@@ -702,6 +710,8 @@ export function createTrees(gl, { map, random }) {
         gl.bindVertexArray(shadowVao);
         gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, count);
         gl.uniform1f(su.uAmbient, 0);
+        // Zpátky na program stromů (bez slunce se blok se stíny od slunce přeskočí).
+        gl.useProgram(program.program);
       }
       if (sunUp > 0) {
         const su = shadowProgram.u;

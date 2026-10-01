@@ -21,4 +21,17 @@ foreach ($scene in Get-ChildItem (Join-Path $project 'scenes') -Directory | Wher
     Write-Host "Snímky: $out"
     if ($process.ExitCode -ne 0) { $failed++ }
 }
+# Alpy ještě za soumraku (slunce pod obzorem): jiné větve kódu než ve dne (stíny, okna, mlha).
+if (-not $env:MOJETAPETA_TEST_ADRESA) {
+    $env:MOJETAPETA_TEST_ADRESA = 'hodina=19.5&mesic=10'
+    $out = Join-Path (Join-Path $PSScriptRoot 'out') 'alpy-soumrak'
+    if (Test-Path $out) { Get-ChildItem $out -File | Remove-Item -Force -ErrorAction SilentlyContinue }
+    $started = Get-Date
+    $process = Start-Process $exe -ArgumentList '--test', "`"$out`"", '--scene', 'alpy', '--root', "`"$project`"" -PassThru
+    if (-not $process.WaitForExit(240000)) { $process.Kill(); throw 'Test Alp za soumraku nedoběhl do 240 s.' }
+    Remove-Item Env:MOJETAPETA_TEST_ADRESA
+    Write-Host '=== alpy za soumraku ==='
+    Get-Content (Join-Path $out 'vysledek.txt') -Encoding UTF8
+    if ($process.ExitCode -ne 0) { $failed++ }
+}
 exit $failed

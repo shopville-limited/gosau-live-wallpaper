@@ -244,6 +244,10 @@ vec3 skyWithClouds(vec3 rd, vec2 uv) {
   vec3 zenith, horizon;
   palette(uSun.y, zenith, horizon);
   vec3 cirrusColor = sunLight() * 0.35 + horizon * 0.6 + vec3(1.0, 0.45, 0.35) * exp(-pow((uSun.y + 0.05) / 0.06, 2.0)) * 0.9;
+  // Při souvislé vysoké oblačnosti (cirrostratus) jsou vlákna slabší a nebe přikryje
+  // jemný mléčný závoj, ne mramorové víry.
+  cirrus *= 1.0 - 0.6 * smoothstep(0.5, 1.0, uCirrus);
+  cirrus = max(cirrus, 0.22 * smoothstep(0.5, 1.0, uCirrus) * smoothstep(0.0, 0.25, rd.y));
   cirrus *= 1.0 - uOvercast;   // nad souvislou vrstvou cirry nejsou vidět
   sky = mix(sky, cirrusColor, cirrus);
   sky += stars(rd) * (1.0 - cirrus) * (1.0 - uRealStars);

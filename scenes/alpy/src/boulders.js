@@ -328,6 +328,10 @@ export function createBoulders(gl, { map }) {
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, list.length);
     gl.bindVertexArray(null);
     gl.disable(gl.BLEND);
+    // Textura obrazu scény nesmí zůstat navázaná (příští snímek do ní kreslí).
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE0);
   }
 
   // Odraz a balvan kreslí stejné instance; zrcadlové jsou v druhé polovině bufferu.

@@ -16,6 +16,7 @@ import { createTrees } from './trees.js';
 import { createWeather } from './weather.js';
 import { createStars } from './stars.js';
 import { createBoulders } from './boulders.js';
+import { createSnapshotCache } from './snapshot-cache.js';
 import { solarPosition, direction, moonPhase, moonDirection, seasonFor, skyFrame, MONTHS } from './sky-clock.js';
 
 const STEP = 1 / 60;
@@ -29,6 +30,9 @@ document.documentElement.classList.toggle('in-app', inApp);
 
 const params = new URLSearchParams(location.search);
 const screenIndex = Math.max(0, Number.parseInt(params.get('screen') || '0', 10) || 0);
+// Obrázek z minula, dokud se scéna nepřipraví (jen v tapetě, ne v náhledu s parametry).
+const snapshotCache = createSnapshotCache(`obrazovka-${screenIndex}-${innerWidth}x${innerHeight}`);
+const cacheAllowed = [...params.keys()].every((k) => k === 'screen');
 
 function randomGenerator(seed) {
   return () => {
@@ -428,6 +432,11 @@ function render() {
   });
   birds.draw({ dpr: state.dpr, blend });
   state.frames++;
+  // Hotová scéna: obrázek z minula zmizí a jednou za čas se uloží nový.
+  if (fullWeight >= 1 && !terrain.busy) {
+    snapshotCache.hide();
+    if (cacheAllowed && state.time - state.doneAt > 20) snapshotCache.maybeSave(canvas, state.time);
+  }
   if (state.frames === 1) document.documentElement.dataset.ready = 'true';
 }
 

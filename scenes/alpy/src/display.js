@@ -517,7 +517,10 @@ vec3 waterColor(vec3 rd, float dist) {
   c += mix(horizon, zenith, 0.5) * 0.12 * fresnel * (0.5 + 0.5 * smoothstep(0.2, 2.0, dist));
   // Odlesky slunce na vlnkách (třpyt), jen když je slunce nad obzorem.
   float glint = pow(max(dot(r, uSun), 0.0), 900.0) * 60.0 + pow(max(dot(r, uSun), 0.0), 90.0) * 0.8;
-  c += sunLight() * glint * smoothstep(0.0, 0.05, uSun.y) * (1.0 - 0.8 * uIce);
+  // Ve stínu hor se slunce na vodě netřpytí.
+  vec2 suv = gl_FragCoord.xy / uPixels;
+  float waterShade = mix(texture(uShadowFrom, suv).r, texture(uShadowTo, suv).r, uShadowMix);
+  c += sunLight() * glint * smoothstep(0.0, 0.05, uSun.y) * (1.0 - 0.8 * uIce) * waterShade;
   // Zamrzlé jezero: nejdřív u břehů a daleko, v plné zimě celé. Tmavý průzračný led
   // (lesklý, zrcadlí hory) s poli a jazyky navátého sněhu, prasklinami a u kamery
   // uklizenou plochou, kde se bruslí, poškrábanou stopami bruslí.

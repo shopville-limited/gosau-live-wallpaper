@@ -666,13 +666,15 @@ void main() {
   // Stín má stejné rozlišení jako materiál; vzdálenost se nesmí filtrovat.
   ivec2 pixel = ivec2(gl_FragCoord.xy);
   float a = texelFetch(uAlbedo, pixel, 0).a;
-  if (a < 0.0 || a > 900.0 || uLight.y < -0.05) {
+  vec3 rd = rayDirection(uv);
+  // Hladina jezera dostane stín hor taky (balvany a třpyt slunce na vodě podle něj).
+  bool water = a < 0.0 && rd.y < 0.0;
+  if ((!water && (a < 0.0 || a > 900.0)) || uLight.y < -0.05) {
     outShadow = vec4(1.0);
     return;
   }
-  float t = a - 100.0 * floor(a / 100.0);
-  vec3 rd = rayDirection(uv);
-  vec3 n = normalize(texelFetch(uNormal, pixel, 0).xyz);
+  float t = water ? CAMERA_HEIGHT / -rd.y : a - 100.0 * floor(a / 100.0);
+  vec3 n = water ? vec3(0.0, 1.0, 0.0) : normalize(texelFetch(uNormal, pixel, 0).xyz);
   vec3 ro = vec3(0.0, CAMERA_HEIGHT, 0.0) + rd * t + n * 0.004;
   if (dot(n, uLight) < -0.25) {
     outShadow = vec4(0.0);

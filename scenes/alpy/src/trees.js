@@ -19,6 +19,7 @@ in vec4 aBase;      // x, y, z země (km), výška stromu (km)
 in vec4 aShape;     // šířka (km), semínko, druh (0 smrk, 1 modřín, 2 buk, 3 keř, 4 tráva, 5 kmen/pařez, 6 rákosí), 1 = ve strmém svahu
 uniform float uTime;
 uniform float uGust;
+uniform float uReflect;   // 1 = odraz v jezeře (zrcadlí se podle hladiny)
 out vec2 vLocal;    // -1..1 napříč, 0..1 odspodu
 out vec3 vWorld;
 out float vSeed;
@@ -56,7 +57,7 @@ void main() {
   vec4 b = project(base);
   vBaseUv = b.xy * 0.5 + 0.5;
   vDistance = length(q - vec3(0.0, CAMERA_HEIGHT, 0.0));
-  gl_Position = project(q);
+  gl_Position = project(uReflect > 0.5 ? vec3(q.x, -q.y, q.z) : q);
   // Pásmo překryvu se vzdáleným lesem (výšková mapa): blízkých stromů postupně ubývá,
   // ať není vidět hranice.
   float fade = smoothstep(${(TREE_NEAR * 0.85).toFixed(3)}, ${TREE_NEAR.toFixed(3)}, length(base.xz));
@@ -78,14 +79,31 @@ uniform vec2 uPixels;
 uniform float uWinter;
 uniform float uAutumn;
 uniform float uSpring;
+uniform float uReflect;
+uniform sampler2D uScene;       // obraz scény (alfa 0 = voda), jen pro odraz
+uniform float uExposure;
+uniform float uContrast;
 out vec4 outColor;
 ${NOISE}
 ${CAMERA}
 ${ATMOSPHERE}
 
+vec3 aces(vec3 x) {
+  return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+}
+
 void main() {
-  // Schovat za terénem, který je blíž.
   float a = texelFetch(uDepth, ivec2(gl_FragCoord.xy), 0).a;
+  if (uReflect > 0.5) {
+    // Odraz jen na volné vodě a jen stromu, jehož pata je z kamery vidět (jinak by se
+    // v jezeře zrcadlil strom schovaný za kopcem).
+    if (texelFetch(uScene, ivec2(gl_FragCoord.xy), 0).a > 0.5) discard;
+    float ab = texture(uDepth, vBaseUv).a;
+    float baseDist = length(vWorld.xz) ;
+    if (ab > 0.0 && ab < 900.0 && ab - 100.0 * floor(ab / 100.0) < baseDist - 0.03) discard;
+    a = -1.0;
+  }
+  // Schovat za terénem, který je blíž.
   if (a > 0.0 && a < 900.0) {
     float k = floor(a / 100.0);
     float terrain = a - 100.0 * k;
@@ -317,6 +335,15 @@ void main() {
   // Vzduch mezi stromem a kamerou.
   vec3 transmit = exp(-vec3(0.020, 0.028, 0.042) * vDistance);
   c = c * transmit + skyColor(normalize(vec3(view.x, 0.05, view.z))) * 0.95 * (1.0 - transmit);
+  if (uReflect > 0.5) {
+    // Odraz: tmavší, v jemných vlnkách se chvěje; rovnou s úpravou barev obrazovky.
+    c *= 0.72;
+    c = aces(c * uExposure);
+    c = pow(c, vec3(uContrast / 2.2));
+    float alpha = 0.8;
+    outColor = vec4(c * alpha, alpha);
+    return;
+  }
   outColor = vec4(c, 1.0);
 }`;
 
@@ -472,6 +499,13 @@ export function createTrees(gl, { map, random }) {
           if (tan > 0.8 && tan < 3.2) cling = 0.75 * smooth(0.4, 0.62, vnoise(px * 30 + 3, pz * 30 + 9) * 0.7 + vnoise(px * 120, pz * 120) * 0.3);
         }
         if (random() > Math.max(density, cling)) {
+          // Nad hranicí lesa (od ~1600 m n. m., 650 m nad jezerem níž už jen na
+          // mírnějších místech) kleč: husté nízké keře kosodřeviny ve skupinách.
+          if (ground > 0.42 && random() < 0.6 * smooth(0.45, 0.7, vnoise(px * 50 + 31, pz * 50 + 7))) {
+            const size = 0.0015 + random() * 0.0015;
+            list.push([px, ground - 0.0003, pz, size, size * (2.0 + random()), 0.217 + random() * 0.05, 3, 0]);
+            continue;
+          }
           // Okraj lesa: kde hustota teprve začíná, lem keřů a mladých stromků.
           const edge = Math.max(density, cling);
           if (edge > 0.08 && edge < 0.45 && random() < 0.55) {
@@ -568,6 +602,54 @@ export function createTrees(gl, { map, random }) {
   return {
     plant,
     get count() { return count; },
+    /** Odraz stromů a rákosí v jezeře, po posledním průchodu (rovnou do obrazovky). */
+    drawReflection(o) {
+      if (!count || !o.scene) return;
+      const u = program.u;
+      gl.useProgram(program.program);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, o.depth);
+      gl.bindSampler(0, nearest);
+      gl.uniform1i(u.uDepth, 0);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, o.shadow);
+      gl.uniform1i(u.uShadow, 1);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, o.scene);
+      gl.bindSampler(2, nearest);
+      gl.uniform1i(u.uScene, 2);
+      gl.activeTexture(gl.TEXTURE0);
+      const w = o.world;
+      gl.uniform1f(u.uAspect, w.aspect);
+      gl.uniform1f(u.uHorizon, w.horizon);
+      gl.uniform1f(u.uSpan, w.span);
+      gl.uniform1f(u.uMirror, w.mirror ? 1 : 0);
+      gl.uniform2f(u.uSeed, ...w.seed);
+      if (u.uOne) gl.uniform1i(u.uOne, 1);
+      gl.uniform2f(u.uPixels, o.pixels[0], o.pixels[1]);
+      gl.uniform1f(u.uTime, o.time);
+      gl.uniform1f(u.uGust, o.gust || 0);
+      gl.uniform3f(u.uSun, ...o.sun);
+      gl.uniform3f(u.uMoon, ...o.moon);
+      gl.uniform1f(u.uMoonPhase, o.moonPhase);
+      gl.uniform1f(u.uOvercast, o.overcast || 0);
+      gl.uniform1f(u.uFlash, 0);
+      gl.uniform1f(u.uWinter, o.season.winter);
+      gl.uniform1f(u.uAutumn, o.season.autumn);
+      gl.uniform1f(u.uSpring, o.season.spring);
+      gl.uniform1f(u.uExposure, o.exposure);
+      gl.uniform1f(u.uContrast, o.contrast);
+      gl.uniform1f(u.uReflect, 1);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.bindVertexArray(vao);
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, count);
+      gl.bindVertexArray(null);
+      gl.disable(gl.BLEND);
+      gl.uniform1f(u.uReflect, 0);
+      gl.bindSampler(0, null);
+      gl.bindSampler(2, null);
+    },
     get sources() { return sources; },
     /** Kreslí do právě nastaveného framebufferu (HDR obraz scény). */
     draw(o) {

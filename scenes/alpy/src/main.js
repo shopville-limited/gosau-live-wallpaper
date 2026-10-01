@@ -332,6 +332,8 @@ function simulate(dt) {
   state.nextGust -= dt;
   if (state.nextGust <= 0) {
     state.gust = 1;
+    // Silný poryv ve dne občas vyplaší kavky z lesa.
+    if (current.sun[1] > 0.05 && random() < 0.4) birds.takeoff();
     state.nextGust = -Math.log(1 - random() * 0.999) * config.vitr.kazdych + 20;
   }
   state.gust *= Math.exp(-dt / 5);
@@ -433,6 +435,15 @@ function render() {
     stars, boulders, particles, date: current.date, sky: skyFrame(current.date, config.cas.sirka, config.cas.delka),
     map: heightMap,
   });
+  // Odrazy blízkých stromů a rákosí (vzdálenější odraz už je v obrazu vody), pak balvanů.
+  if (fullWeight >= 1) {
+    trees.drawReflection({
+      world, pixels: state.pixels, time, gust: state.gust, sun: current.sun, moon: current.moon,
+      moonPhase: current.moonPhase, overcast: state.wx.overcast, season: current.season,
+      exposure: config.jas * exposureFor(s), contrast: config.kontrast,
+      shadow: terrain.shadowState(state.time).to, depth: terrain.full.albedo, scene: display.sceneTexture,
+    });
+  }
   boulders.drawReflection({
     world, pixels: state.pixels, time, sun: current.sun, moon: current.moon, moonPhase: current.moonPhase,
     overcast: state.wx.overcast, flash: 0, exposure: config.jas * exposureFor(s), contrast: config.kontrast,
@@ -486,7 +497,7 @@ const actions = {
   listi: () => { state.gust = 1; },
   // Jen pro náhled (?akce=boure): minuta bouřky s blesky.
   boure: () => { state.stormUntil = state.time + 60; state.nextStrike = 0.5; },
-  vitr: () => { state.gust = 1; },
+  vitr: () => { state.gust = 1; if (current && current.sun[1] > 0.05) birds.takeoff(); },
   // Celý den od půlnoci za pár minut, pak zpátky ke skutečnému času.
   den: () => {
     const from = currentDate();

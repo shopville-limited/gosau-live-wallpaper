@@ -351,6 +351,21 @@ export function createBirds(gl, { config, random }) {
   return {
     setView(width, height) { view = [width, height]; },
     flock() { flock(true); },
+    /** Poryv vyplaší kavky z lesa: hejno vzlétne nízko nad stromy a stoupá. */
+    takeoff() {
+      if (flocks.length >= MAX_FLOCKS) return;
+      const before = flocks.length;
+      flock(true, true);
+      const f = flocks[flocks.length - 1];
+      if (!f || flocks.length === before) return;
+      const [w, h] = view;
+      const x = w * (0.15 + random() * 0.7);
+      const dy = h * 0.38 - f.y;
+      f.roost = null;
+      f.x = x;
+      f.y = h * 0.38;
+      for (const b of birds) if (b.flock === f) { b.x += x - (f.heading > 0 ? -60 : w + 60); b.y += dy; b.vy = 40; }
+    },
     roost() { flock(true, true); },
     step,
     draw({ dpr, blend = 1 }) {

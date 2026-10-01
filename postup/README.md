@@ -392,3 +392,9 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Podzim: zlaté modříny, oranžové buky, vínové borůvčí, rákosí u břehu](65-podzim-zlate-modriny-oranzove-buky-vinov.jpg)
 
+## 66. Odraz blízkých smrků a rákosí v hladině
+
+*2026-10-01 17:00*
+
+![Odraz blízkých smrků a rákosí v hladině](66-odraz-blizkych-smrku-a-rakosi-v-hladine.jpg)
+

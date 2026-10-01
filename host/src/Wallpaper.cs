@@ -1,4 +1,4 @@
-// Jedna obrazovka tapety: okno bez rámečku s WebView2, které ukazuje scénu.
+﻿// Jedna obrazovka tapety: okno bez rámečku s WebView2, které ukazuje scénu.
 //
 // Okno nikdy nebere myš. Kurzor se do scény dostane jinak: aplikace čte jeho polohu
 // a posílá ji stránce jako pointermove, takže klikání na plochu dál patří Průzkumníkovi.
@@ -100,6 +100,34 @@ namespace MojeTapeta
             core.ProcessFailed += delegate (object sender, CoreWebView2ProcessFailedEventArgs e)
             {
                 Log.Write("Obrazovka " + (index + 1) + ": proces prohlížeče selhal (" + e.ProcessFailedKind + ")");
+                // Zaseknutí krátce po načtení bývá jen dlouhý první překlad shaderů po
+                // aktualizaci (grafika je chvíli zaneprázdněná). Znovunačtení by překlad
+                // spustilo od začátku; raději počkat a pak ověřit, jestli stránka odpovídá.
+                if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.RenderProcessUnresponsive &&
+                    (DateTime.UtcNow - navigatedAt).TotalSeconds < 90)
+                {
+                    if (waitingForCompile) return;
+                    waitingForCompile = true;
+                    Log.Write("Obrazovka " + (index + 1) + ": stránka se zasekla krátce po načtení (překlad shaderů?), čekám minutu.");
+                    var watch = new System.Windows.Forms.Timer();
+                    watch.Interval = 60000;
+                    watch.Tick += async delegate
+                    {
+                        watch.Stop();
+                        watch.Dispose();
+                        waitingForCompile = false;
+                        var answer = Evaluate("1");
+                        if (await Task.WhenAny(answer, Task.Delay(10000)) == answer)
+                        {
+                            Log.Write("Obrazovka " + (index + 1) + ": stránka zase odpovídá.");
+                            return;
+                        }
+                        Log.Write("Obrazovka " + (index + 1) + ": stránka pořád neodpovídá, načítám ji znovu.");
+                        Reload();
+                    };
+                    watch.Start();
+                    return;
+                }
                 // Po pádu grafiky nebo stránky ji po chvíli načíst znovu; při opakovaných pádech
                 // s delším odstupem (5 s, 20 s, 1 min, pak 5 min), ať se grafika stihne zotavit.
                 failures++;
@@ -128,8 +156,12 @@ namespace MojeTapeta
             }
         }
 
+        DateTime navigatedAt = DateTime.UtcNow;
+        bool waitingForCompile;
+
         void OnNavigated(object sender, CoreWebView2NavigationCompletedEventArgs e)
         {
+            navigatedAt = DateTime.UtcNow;
             if (!e.IsSuccess)
             {
                 Log.Write("Obrazovka " + (index + 1) + ": scénu se nepodařilo načíst (" + e.WebErrorStatus + ")");

@@ -168,7 +168,8 @@ void main() {
       best = min(best, d);
       if (hash12(vec2(fi + 3.0, vSeed * 29.0)) < 0.35) tipFlower = min(tipFlower, length(p - b) - 0.09);
     }
-    bool flower = tipFlower < 0.0 && summer > 0.6;
+    // Kvete v létě, na jaře (květen) pampelišky a jarní kvítí.
+    bool flower = tipFlower < 0.0 && (summer > 0.6 || uSpring > 0.5);
     if (best > 0.0 && !flower) discard;
     width = 1.0;
     vec3 grass = mix(vec3(0.05, 0.09, 0.025), vec3(0.09, 0.12, 0.035), fract(vSeed * 5.1));
@@ -179,6 +180,8 @@ void main() {
       float pick = fract(vSeed * 17.3);
       // Alpské kvítí: kopretiny, pryskyřníky, zvonky, hvozdíky.
       color = pick < 0.35 ? vec3(0.75, 0.75, 0.7) : pick < 0.6 ? vec3(0.75, 0.6, 0.05) : pick < 0.85 ? vec3(0.25, 0.15, 0.55) : vec3(0.6, 0.15, 0.3);
+      // Jaro: hlavně žluté pampelišky a blatouchy, k tomu bílé sasanky.
+      if (uSpring > 0.5) color = pick < 0.7 ? vec3(0.8, 0.62, 0.03) : vec3(0.78, 0.78, 0.74);
       lit = 0.9;
     }
   } else if (vKind > 2.5) {
@@ -308,6 +311,9 @@ void main() {
       float turn = clamp(uAutumn * (0.4 + 1.2 * fract(vSeed * 13.7)) + 0.25 * gnoise(vec2(x, y) * 7.0 + vSeed), 0.0, 1.0);
       vec3 autumnLeaf = mix(vec3(0.12, 0.10, 0.02), vec3(0.20, 0.07, 0.018), fract(vSeed * 5.3));
       color = mix(beech, autumnLeaf, turn) * (0.85 + 0.3 * leafNoise);
+      // V květnu některé listnáče u jezera (třešně, jeřáby, hlohy) kvetou bíle.
+      float blossom = uSpring * step(0.82, fract(vSeed * 11.3)) * smoothstep(0.45, 0.75, leafNoise);
+      color = mix(color, vec3(0.30, 0.26, 0.26), blossom * 0.7);
       float toward = dot(normalize(bestN + vec2(0.0, 1e-3)), sunDir);
       // Světlá strana chomáče ke slunci, vnitřek a spodek ve stínu listí nad ním.
       lit = (0.3 + 0.7 * smoothstep(-0.5, 0.9, toward)) * bestShade * mix(0.65, 1.05, smoothstep(0.2, 0.95, best));
@@ -437,6 +443,7 @@ export function createTrees(gl, { map, random }) {
   const buffer = gl.createBuffer();
   let count = 0;
   let sources = [];
+  let meadows = [];
 
   gl.bindVertexArray(vao);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -591,6 +598,8 @@ export function createTrees(gl, { map, random }) {
     for (const t of list) kinds[t[6]]++;
     console.warn(`Vegetace: smrků ${kinds[0]}, modřínů ${kinds[1]}, buků ${kinds[2]}, keřů ${kinds[3]}, trsů trávy ${kinds[4]}, kmenů a pařezů ${kinds[5]}, trsů rákosí ${kinds[6]}`);
     // Zdroje padajícího listí a sněhu z větví (blízké stromy, km): x, y koruny, z, druh.
+    // Louky pro svatojánské mušky: trsy trávy blízko kamery.
+    meadows = list.filter((t) => t[6] === 4 && Math.hypot(t[0], t[2]) < 0.5).map((t) => [t[0], t[1], t[2]]);
     sources = list.filter((t) => t[6] <= 2 && Math.hypot(t[0], t[2]) < 0.6)
       .map((t) => [t[0], t[1] + t[3] * 0.6, t[2], t[6], t[4]]);
   }
@@ -655,6 +664,7 @@ export function createTrees(gl, { map, random }) {
       gl.bindSampler(2, null);
     },
     get sources() { return sources; },
+    get meadows() { return meadows; },
     /** Kreslí do právě nastaveného framebufferu (HDR obraz scény). */
     draw(o) {
       if (!count) return;

@@ -375,7 +375,10 @@ function simulate(dt) {
   const tau = snow === 0 && current.season.winter < 0.5 && state.time >= state.snowUntil ? 1 : 6;
   state.snowfall += (snow - state.snowfall) * (1 - Math.exp(-dt / tau));
 
-  particles.step(dt, trees.sources, current.season, state.gust);
+  // Světlušky: červen a červenec, za tmy (slunce pod obzorem), jen za jasna a bez deště.
+  const month = current.date.getMonth() + 1;
+  const firefly = (month === 6 || month === 7) && current.sun[1] < -0.04 ? (1 - state.wx.rain) * (1 - 0.7 * state.wx.overcast) : 0;
+  particles.step(dt, trees.sources, current.season, state.gust, firefly, trees.meadows);
   boats.step(dt, current.sun, current.season.ice, state.wx ? state.wx.rain + state.wx.storm : 0);
 
   // Ptáci létají jen ve dne.

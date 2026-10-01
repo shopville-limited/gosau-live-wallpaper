@@ -398,3 +398,15 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Odraz blízkých smrků a rákosí v hladině](66-odraz-blizkych-smrku-a-rakosi-v-hladine.jpg)
 
+## 67. Oprava: blízké stromy za soumraku zpátky (místo bílých pruhů)
+
+*2026-10-01 19:00*
+
+![Oprava: blízké stromy za soumraku zpátky (místo bílých pruhů)](67-oprava-blizke-stromy-za-soumraku-zpatky.jpg)
+
+## 68. Květen: kvetoucí stromy u jezera, pampelišky na louce
+
+*2026-10-01 19:30*
+
+![Květen: kvetoucí stromy u jezera, pampelišky na louce](68-kveten-kvetouci-stromy-u-jezera-pampelis.jpg)
+

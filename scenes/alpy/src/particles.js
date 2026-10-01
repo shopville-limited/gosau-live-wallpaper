@@ -2,14 +2,16 @@
 // Na podzim se z buků a modřínů občas utrhne list a s kymácením se snáší k zemi, při
 // poryvu větru jich je víc. V zimě poryv setřese ze smrků sníh: krátký obláček drobných
 // vloček. Částice žijí v souřadnicích světa (km), kreslí se jako body do obrazu scény
-// (projdou pak úpravou barev i odrazem v jezeře).
+// (projdou pak úpravou barev i odrazem v jezeře). V červnu a červenci se za tmy nad
+// loukami u jezera vznášejí svatojánské mušky: drobná zelenožlutá světélka, která
+// pomalu bloudí, rozsvěcují se a zhasínají.
 
 import { createProgram } from '../../shared/gl.js';
 import { NOISE } from '../../shared/glsl.js';
 import { CAMERA, ATMOSPHERE } from './world.js';
 
 const MAX = 600;
-const FLOATS = 6;   // x, y, z (km), velikost (m), druh (0 list, 1 sníh), průhlednost
+const FLOATS = 6;   // x, y, z (km), velikost (m), druh (0 list, 1 sníh, 2 světluška), průhlednost
 
 const VS = /* glsl */ `#version 300 es
 precision highp float;
@@ -51,6 +53,14 @@ void main() {
   vec2 p = gl_PointCoord * 2.0 - 1.0;
   float shape;
   vec3 base;
+  if (vKind > 1.5) {
+    // Světluška: zářící bod s měkkou září (vlastní světlo, ne odražené).
+    float glow = exp(-dot(p, p) * 6.0);
+    if (glow * vAlpha < 0.01) discard;
+    vec3 c = vec3(0.75, 1.0, 0.3) * glow * vAlpha * 2.5;
+    outColor = vec4(c, 0.0);
+    return;
+  }
   if (vKind < 0.5) {
     // List: protáhlá elipsa natočená podle semínka, barva od žluté po rezavou.
     float a = vSeed * 6.28 + uTime * (1.0 + vSeed * 2.0);
@@ -75,6 +85,7 @@ export function createParticles(gl, { random }) {
   const data = new Float32Array(MAX * FLOATS);
   const parts = [];
   let leafClock = 0;
+  let flyClock = 0;
   let lastGust = 0;
 
   gl.bindVertexArray(vao);
@@ -102,7 +113,17 @@ export function createParticles(gl, { random }) {
 
   return {
     /** Simulace: dt s, sources z trees.sources, season, gust 0..1, směr větru (km/s). */
-    step(dt, sources, season, gust) {
+    step(dt, sources, season, gust, firefliesWanted = 0, meadows = []) {
+      // Světlušky: v létě za tmy nad loukami blízko kamery, asi 40 najednou.
+      const flies = parts.filter((p) => p.kind === 2).length;
+      flyClock += dt * firefliesWanted * 4;
+      while (flyClock > 1 && meadows.length) {
+        flyClock -= 1;
+        if (flies >= 40 * firefliesWanted) break;
+        const m = meadows[Math.floor(random() * meadows.length)];
+        parts.push({ x: m[0], y: m[1] + 0.0004 + random() * 0.0012, z: m[2], vx: 0, vz: 0, kind: 2, age: 0,
+          life: 8 + random() * 10, phase: random() * 6.28, size: 0.35 });
+      }
       const deciduous = sources.filter((s) => s[3] >= 1);
       // Listí: podzim (nejvíc v říjnu–listopadu), víc při poryvu.
       const leafRate = deciduous.length ? season.autumn * (0.6 + 6 * gust) : 0;
@@ -123,7 +144,12 @@ export function createParticles(gl, { random }) {
       for (let i = parts.length - 1; i >= 0; i--) {
         const p = parts[i];
         p.age += dt;
-        if (p.kind === 0) {
+        if (p.kind === 2) {
+          // Bloudí pomalu sem a tam, kousek nad trávou.
+          p.x += Math.sin(p.age * 0.7 + p.phase) * 0.0003 * dt;
+          p.z += Math.cos(p.age * 0.5 + p.phase * 2.0) * 0.0003 * dt;
+          p.y += Math.sin(p.age * 0.9 + p.phase * 3.0) * 0.0002 * dt;
+        } else if (p.kind === 0) {
           // List se snáší pomalu (0,6 m/s) a kymácí se ze strany na stranu.
           p.y -= 0.0006 * dt;
           p.x += (wind + Math.sin(p.age * 2.2 + p.phase) * 0.0007) * dt;
@@ -141,7 +167,9 @@ export function createParticles(gl, { random }) {
       if (!parts.length) return;
       let n = 0;
       for (const p of parts) {
-        const fade = Math.min(1, p.age / 0.6, (p.life - p.age) / 1.2);
+        let fade = Math.min(1, p.age / 0.6, (p.life - p.age) / 1.2);
+        // Světluška bliká: krátce se rozsvítí, pak chvíli tma.
+        if (p.kind === 2) fade *= Math.max(0, Math.sin(p.age * 1.6 + p.phase)) ** 3;
         data.set([p.x, p.y, p.z, p.size, p.kind, Math.max(0, fade) * (p.kind === 1 ? 0.7 : 1)], n * FLOATS);
         n++;
       }

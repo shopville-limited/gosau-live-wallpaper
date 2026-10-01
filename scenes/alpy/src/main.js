@@ -144,12 +144,14 @@ const urlHour = params.has('hodina') ? Number(params.get('hodina')) : null;
 const urlMonth = params.has('mesic') ? Number(params.get('mesic')) : null;
 const urlDay = params.has('den') ? Math.min(31, Math.max(1, Math.round(Number(params.get('den'))) || 15)) : 15;
 let dayOfMonth = urlDay;   // náhled: den v měsíci (posuvník), jen spolu se zvoleným měsícem
+// Náhled: ?zrychleni=N spustí zrychlený čas od zvolené hodiny (pro video).
+const urlSpeed = params.has('zrychleni') ? Math.max(1, Number(params.get('zrychleni')) || 1) : 1;
 const clock = {
   hour: Number.isFinite(urlHour) ? urlHour : config.cas.rezim === 'pevny' ? config.cas.hodina : null,
   month: Number.isFinite(urlMonth) ? Math.min(12, Math.max(1, urlMonth))
     : config.cas.mesic === 'skutecny' ? null : Math.min(12, Math.max(1, Number(config.cas.mesic) || 1)),
   play: null,   // { from: Date, start: čas scény }
-  speed: 1,     // zrychlení času (jen náhled): 1 = skutečný čas
+  speed: urlSpeed,   // zrychlení času (jen náhled): 1 = skutečný čas
   anchor: null, // { real, virtual } pro zrychlený čas
 };
 
@@ -514,6 +516,8 @@ const actions = {
   kavky: () => birds.roost(),
   // Jen pro náhled (?akce=listi): podzimní poryv, aby bylo listí vidět hned.
   listi: () => { state.gust = 1; },
+  // Jen pro video: padající hvězda hned teď.
+  meteor: () => { state.meteorAt = state.time; state.meteorSeed = (state.meteorSeed + 1) % 997; state.nextMeteor = 60; },
   // Jen pro náhled (?akce=boure): minuta bouřky s blesky.
   boure: () => { state.stormUntil = state.time + 60; state.nextStrike = 0.5; },
   vitr: () => { state.gust = 1; if (current && current.sun[1] > 0.05) birds.takeoff(); },
@@ -692,6 +696,36 @@ applyRate();
 for (const id of (params.get('akce') || '').split(',').filter(Boolean)) actions[id]?.();
 
 document.addEventListener('visibilitychange', () => loop.setHidden(document.hidden));
+
+// Nahrávání záběru pro video: ?nahravat=4&nazev=zima&behem=boure,ptaci počká, až je
+// krajina dopočítaná, spustí akce z „behem“ a nahraje plátno (sekundy) na server náhledu.
+if (params.has('nahravat')) {
+  const seconds = Number(params.get('nahravat')) || 4;
+  const name = params.get('nazev') || 'zaber';
+  const waitReady = () => new Promise((resolve) => {
+    const check = () => (window.sceneCheck && window.sceneCheck('hotovo') ? resolve() : setTimeout(check, 500));
+    check();
+  });
+  window.nahravani = 'čekám na krajinu';
+  waitReady().then(() => new Promise((r) => setTimeout(r, 2500))).then(() => {
+    window.nahravani = 'nahrávám';
+    for (const id of (params.get('behem') || '').split(',').filter(Boolean)) actions[id]?.();
+    if (clock.speed !== 1) clock.anchor = { real: Date.now(), virtual: currentDate().getTime() };
+    const stream = canvas.captureStream(30);
+    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 40e6 });
+    const parts = [];
+    recorder.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+    recorder.onerror = (e) => { window.nahravani = 'chyba: ' + e.error; };
+    recorder.onstop = async () => {
+      window.nahravani = `odesílám ${parts.length} částí`;
+      await fetch(`/nahravka?nazev=${encodeURIComponent(name)}`, { method: 'PUT', body: new Blob(parts, { type: 'video/webm' }) });
+      document.title = 'NAHRANO ' + name;
+      window.nahravani = 'hotovo';
+    };
+    recorder.start(500);
+    setTimeout(() => recorder.stop(), seconds * 1000);
+  });
+}
 loop.setHidden(document.hidden);
 
 let resizeTimer = null;

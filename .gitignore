@@ -4,3 +4,5 @@ host/tests/last.txt
 .playwright-mcp/
 node_modules/
 tools/.cache/
+postup/video/zabery/
+postup/video/texty/

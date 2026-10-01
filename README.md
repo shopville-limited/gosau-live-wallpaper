@@ -1,4 +1,16 @@
-# Moje tapeta
+# Moje tapeta: živé Rakouské Alpy na ploše Windows
+
+![Gosausee a Dachstein za svítání](postup/58-svitani-prizemni-mlha-nad-jezerem-okno-c.jpg)
+
+**[▶ Video (27 s)](postup/video/moje-tapeta-linkedin.mp4)** · **[Co všechno tapeta umí](postup/video/PREZENTACE.md)** · **[Galerie vývoje](postup/README.md)**
+
+Horské jezero Gosausee s Dachsteinem ze skutečných výškových dat Rakouska. Slunce podle hodin, roční období podle kalendáře, počasí podle aktuálních dat z Gosau a skutečná noční obloha. Každý snímek se počítá v reálném čase na grafické kartě; když hrajete hru, tapeta se sama zastaví.
+
+**Rychlý start:** potřebujete Windows 10 nebo 11 s Microsoft Edge WebView2 (ve Windows 11 je). Stáhněte repozitář a spusťte `host\install.cmd`. Aplikace se sestaví vestavěným kompilátorem .NET Framework 4.8, nainstaluje bez práv správce a spustí se po každém přihlášení. Odinstalace: `host\uninstall.cmd`.
+
+*Made with Claude – model Opus 5.5.* Celou tapetu, od aplikace pro Windows po shadery, napsal Claude v Claude Code podle zadání a připomínek autora (Jiří Macek).
+
+---
 
 Živá tapeta pro Windows 10 a 11. Na každý monitor položí pod ikony plochy okno s WebView2 a posílá do něj polohu kurzoru. Ikony, klikání i výběr na ploše fungují dál jako obvykle.
 

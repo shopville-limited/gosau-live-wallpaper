@@ -52,7 +52,7 @@ Plocha počítače, která žije. Místo statického obrázku se pod ikonami roz
   - objemové mraky, odrazy ve vodě počítané paprskem v prostoru obrazovky,
   - 3D modely loděk, zvířat a balvanů ze vzdálenostních funkcí,
   - tisíce instancí vegetace, filmová úprava barev a zrno.
-- **Kvalita:** samotest běží ve stejném prostředí jako tapeta, ve dne i za soumraku, a průběh vývoje dokumentuje 70 snímků v galerii.
+- **Kvalita:** samotest běží ve stejném prostředí jako tapeta, ve dne i za soumraku, a průběh vývoje dokumentuje přes 70 snímků v galerii.
 
 ---
 

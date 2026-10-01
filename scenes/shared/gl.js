@@ -7,7 +7,16 @@ void main() {
   gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
+// Ladění: ?prekladat v adrese obejde mezipaměť přeložených shaderů (jako po aktualizaci)
+// a do konzole se vypíše, jak dlouho se který program překládal.
+const fresh = typeof location !== 'undefined' && new URLSearchParams(location.search).has('prekladat');
+const stamp = `
+// ${Date.now()}-${Math.random()}
+`;
+export const compileTimes = [];
+
 function linkProgram(gl, vertexSource, fragmentSource) {
+  if (fresh) fragmentSource += stamp;
   const compile = (type, source) => {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
@@ -46,7 +55,10 @@ function finishProgram(gl, { program, vs, fs }, label) {
 }
 
 export function createProgram(gl, vertexSource, fragmentSource, label) {
-  return finishProgram(gl, linkProgram(gl, vertexSource, fragmentSource), label);
+  const t0 = performance.now();
+  const result = finishProgram(gl, linkProgram(gl, vertexSource, fragmentSource), label);
+  compileTimes.push([label, Math.round(performance.now() - t0), 'hned']);
+  return result;
 }
 
 /**
@@ -55,6 +67,7 @@ export function createProgram(gl, vertexSource, fragmentSource, label) {
  */
 export function createProgramAsync(gl, vertexSource, fragmentSource, label) {
   const ext = gl.getExtension('KHR_parallel_shader_compile');
+  const t0 = performance.now();
   const linked = linkProgram(gl, vertexSource, fragmentSource);
   return new Promise((resolve, reject) => {
     const check = () => {
@@ -63,7 +76,9 @@ export function createProgramAsync(gl, vertexSource, fragmentSource, label) {
         return;
       }
       try {
-        resolve(finishProgram(gl, linked, label));
+        const result = finishProgram(gl, linked, label);
+        compileTimes.push([label, Math.round(performance.now() - t0), 'na pozadí']);
+        resolve(result);
       } catch (error) {
         reject(error);
       }

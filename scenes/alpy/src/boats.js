@@ -5,7 +5,7 @@
 // Kreslí se jako 3D modely (vzdálenostní funkce) v obdélníku kolem loďky, i s odrazem.
 // Brázdu ve tvaru V (Kelvinův úhel) kreslí vodní shader podle poloh z wakes().
 
-import { createProgram } from '../../shared/gl.js';
+import { createProgramAsync } from '../../shared/gl.js';
 import { NOISE } from '../../shared/glsl.js';
 import { CAMERA, ATMOSPHERE } from './world.js';
 
@@ -325,10 +325,23 @@ vec2 scene(vec3 p) {
   return r;
 }
 
-vec3 normalAt(vec3 p, float e) {
+// Normála (4 body), materiál a zastínění jednou smyčkou: scene() se tak do shaderu
+// vloží jen jednou (každé další volání by překlad prodloužilo o sekundy).
+void surfaceInfo(vec3 p, float e, out vec3 n, out float material, out float ao) {
   vec2 k = vec2(1.0, -1.0);
-  return normalize(k.xyy * scene(p + k.xyy * e).x + k.yyx * scene(p + k.yyx * e).x
-                 + k.yxy * scene(p + k.yxy * e).x + k.xxx * scene(p + k.xxx * e).x);
+  vec3 sum = vec3(0.0);
+  n = vec3(0.0, 1.0, 0.0);
+  material = 0.0;
+  ao = 1.0;
+  for (int i = 0; i < 6 * uOne; i++) {
+    vec3 o = i == 0 ? k.xyy : i == 1 ? k.yyx : i == 2 ? k.yxy : k.xxx;
+    vec3 q = i < 4 ? p + o * e : i == 4 ? p : p + n * 0.12;
+    vec2 r = scene(q);
+    if (i < 4) sum += o * r.x;
+    if (i == 3) n = normalize(sum);
+    if (i == 4) material = r.y;
+    if (i == 5) ao = clamp(0.35 + 0.65 * r.x / 0.12, 0.0, 1.0);
+  }
 }
 
 vec3 albedo(float m, vec3 p) {
@@ -411,15 +424,15 @@ void main() {
   vec3 p = ro + dir * (hit ? t : bestT);
   vec3 c = vec3(0.0);
   if (cover > 0.0) {
-    float m = scene(p).y;
-    vec3 n = normalAt(p, max(pix * bestT * 0.5, 0.004));
+    vec3 n;
+    float m, ao;
+    surfaceInfo(p, max(pix * bestT * 0.5, 0.004), n, m, ao);
     vec3 base = albedo(m, p);
     // Světlo v soustavě loďky: slunce se stínem hor, obloha, odraz od vody, měsíc.
     vec3 sunL = vec3(dot(uSun, fwd), uSun.y, dot(uSun, side));
     vec3 moonL = vec3(dot(uMoon, fwd), uMoon.y, dot(uMoon, side));
     float shade = texture(uShadow, vWaterUv).r;
     if (uSun.y < -0.03) shade = 1.0;
-    float ao = clamp(0.35 + 0.65 * scene(p + n * 0.12).x / 0.12, 0.0, 1.0);
     vec3 zenith, horizon;
     palette(uSun.y, zenith, horizon);
     vec3 sky = mix(horizon, zenith, 0.5 + 0.5 * n.y) * (0.55 + 0.45 * n.y);
@@ -474,8 +487,8 @@ void main() {
   outColor = vec4(c * alpha, alpha);
 }`;
 
-export function createBoats(gl, { map, random, config }) {
-  const program = createProgram(gl, VS, FS, 'boats');
+export async function createBoats(gl, { map, random, config }) {
+  const program = await createProgramAsync(gl, VS, FS, 'boats');
   const vao = gl.createVertexArray();
   const buffer = gl.createBuffer();
   const data = new Float32Array(MAX_DRAWN * 2 * FLOATS);

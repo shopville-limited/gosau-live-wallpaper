@@ -6,7 +6,7 @@
 // K tomu podrost (borůvčí, kapradí, mladé smrčky) u paty stromů a na okraji lesa
 // a trsy trávy s kvítím na loukách blízko kamery; všechno se vlní ve vlnách poryvů.
 
-import { createProgram } from '../../shared/gl.js';
+import { createProgramAsync } from '../../shared/gl.js';
 import { NOISE } from '../../shared/glsl.js';
 import { CAMERA, ATMOSPHERE } from './world.js';
 
@@ -440,10 +440,12 @@ void main() {
   outColor = vec4(k, k, k, 1.0);
 }`;
 
-export function createTrees(gl, { map, random }) {
-  const shadowProgram = createProgram(gl, SHADOW_VS, SHADOW_FS, 'tree-shadows');
+export async function createTrees(gl, { map, random }) {
+  const [shadowProgram, program] = await Promise.all([
+    createProgramAsync(gl, SHADOW_VS, SHADOW_FS, 'tree-shadows'),
+    createProgramAsync(gl, VS, FS, 'trees'),
+  ]);
   const shadowVao = gl.createVertexArray();
-  const program = createProgram(gl, VS, FS, 'trees');
   const vao = gl.createVertexArray();
   const buffer = gl.createBuffer();
   let count = 0;

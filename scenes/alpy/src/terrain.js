@@ -177,6 +177,12 @@ float boulderMask(vec2 p) {
   return smoothstep(-0.0015, 0.0, boulders(p));
 }
 
+// Jen data (5 oktáv, bez skal a stromů): malá funkce pro hrubé normály a okolí. Volání
+// plné height() se do shaderu vkládá celé a každé navíc prodlouží překlad o sekundy.
+float baseHeight(vec2 p) {
+  return max(mapHeight(p), boulders(p));
+}
+
 float height(vec2 p, int octaves) {
   float h = max(mapHeight(p), boulders(p));
   float base = h;   // = height(p, 5); podle ní se rozhoduje o stromech i při barvení
@@ -332,7 +338,7 @@ Surface surfaceAt(vec3 p, float t) {
   // do shaderu znovu a překlad by trval desítky sekund.)
   float wallW = (1.0 - smoothstep(0.45, 0.8, n.y)) * (1.0 - smoothstep(1.5, 3.0, t));
   float eps = wallW > 0.5 ? 0.006 : max(0.02, 0.004 * t);
-  vec3 hs = tripleHeight(p.xz, eps, 5);
+  vec3 hs = vec3(baseHeight(p.xz), baseHeight(p.xz + vec2(eps, 0.0)), baseHeight(p.xz + vec2(0.0, eps)));
   float hc = hs.x;
   vec3 coarse = normalize(vec3(hs.x - hs.y, eps, hs.x - hs.z));
   float slope = coarse.y;
@@ -351,7 +357,7 @@ Surface surfaceAt(vec3 p, float t) {
     float a = float(i / 2) * 1.0472;
     float r = (i % 2 == 0) ? 0.06 : 0.3;
     vec2 dir = vec2(cos(a), sin(a));
-    occ += clamp((height(p.xz + dir * r, 5) - hc) / r, 0.0, 1.0) * ((i % 2 == 0) ? 1.0 : 0.7);
+    occ += clamp((baseHeight(p.xz + dir * r) - hc) / r, 0.0, 1.0) * ((i % 2 == 0) ? 1.0 : 0.7);
   }
   float occlusion = 1.0 - clamp(occ / 10.2, 0.0, 0.8);
 
@@ -599,7 +605,7 @@ Surface surfaceAt(vec3 p, float t) {
     float around = 0.0;
     for (int i = 0; i < 4 * uOne; i++) {
       float a = float(i) * 1.5708;
-      around += 0.25 * height(p.xz + vec2(cos(a), sin(a)) * r, 6);
+      around += 0.25 * baseHeight(p.xz + vec2(cos(a), sin(a)) * r);
     }
     snow *= mix(smoothstep(0.012, -0.004, hc - around), 1.0, glacier * 0.7);
   }

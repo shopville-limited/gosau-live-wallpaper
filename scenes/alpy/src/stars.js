@@ -5,7 +5,7 @@
 // v jezeře. Jas podle magnitudy, barva podle teploty hvězdy, nízko u obzoru slábnou
 // a víc se třpytí. Za svítání a při měsíci zmizí nejdřív ty nejslabší.
 
-import { createProgram } from '../../shared/gl.js';
+import { createProgramAsync } from '../../shared/gl.js';
 import { NOISE } from '../../shared/glsl.js';
 import { CAMERA, ATMOSPHERE } from './world.js';
 import { planets } from './sky-clock.js';
@@ -88,8 +88,8 @@ void main() {
   outColor = vec4(c, 0.0);
 }`;
 
-export function createStars(gl, { url }) {
-  const program = createProgram(gl, VS, FS, 'stars');
+export async function createStars(gl, { url }) {
+  const program = await createProgramAsync(gl, VS, FS, 'stars');
   const vao = gl.createVertexArray();
   const buffer = gl.createBuffer();
   let count = 0;

@@ -7,7 +7,7 @@
 //   1. krajina a obloha do HDR textury (pixely jezera zůstanou prázdné),
 //   2. jezero čte odraz z té textury, pak tónová křivka a sněžení na obrazovku.
 
-import { FULLSCREEN_VS, createProgram, createTarget } from '../../shared/gl.js';
+import { FULLSCREEN_VS, createProgramAsync, createTarget } from '../../shared/gl.js';
 import { NOISE } from '../../shared/glsl.js';
 import { CAMERA, ATMOSPHERE } from './world.js';
 import { MAX_BOATS } from './boats.js';
@@ -872,11 +872,13 @@ function createMipTarget(gl, width, height) {
 // Bez blesku: pole bodů kanálu samé nuly.
 const ZERO_BOLT = new Float32Array(24);
 
-export function createDisplay(gl) {
-  const cloudPass = createProgram(gl, FULLSCREEN_VS, source('PASS_CLOUDS'), 'alpy-clouds');
-  const scenePass = createProgram(gl, FULLSCREEN_VS, source('PASS_SCENE'), 'alpy-scene');
+export async function createDisplay(gl) {
+  const [cloudPass, scenePass, finalPass] = await Promise.all([
+    createProgramAsync(gl, FULLSCREEN_VS, source('PASS_CLOUDS'), 'alpy-clouds'),
+    createProgramAsync(gl, FULLSCREEN_VS, source('PASS_SCENE'), 'alpy-scene'),
+    createProgramAsync(gl, FULLSCREEN_VS, source('PASS_FINAL'), 'alpy-final'),
+  ]);
   let clouds = null;
-  const finalPass = createProgram(gl, FULLSCREEN_VS, source('PASS_FINAL'), 'alpy-final');
   let scene = null;
   const vao = gl.createVertexArray();
   // Vzorkovač bez filtrování pro vzdálenost v alfě.

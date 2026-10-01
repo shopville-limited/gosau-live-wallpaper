@@ -7,7 +7,7 @@
 // a úpravou barev jako zbytek krajiny) a jeho odraz po posledním průchodu, přes hladinu
 // (jako u loděk). Každý balvan je obdélník na obrazovce, v něm se hledá povrch paprskem.
 
-import { createProgram } from '../../shared/gl.js';
+import { createProgramAsync } from '../../shared/gl.js';
 import { NOISE } from '../../shared/glsl.js';
 import { CAMERA, ATMOSPHERE } from './world.js';
 
@@ -126,10 +126,19 @@ float shape(vec3 p) {
   return d;
 }
 
-vec3 normalAt(vec3 p, float e) {
+// Normála (4 body) a zastínění jednou smyčkou (shape() se vloží do shaderu jen jednou).
+void surfaceInfo(vec3 p, float e, out vec3 n, out float ao) {
   vec2 k = vec2(1.0, -1.0);
-  return normalize(k.xyy * shape(p + k.xyy * e) + k.yyx * shape(p + k.yyx * e)
-                 + k.yxy * shape(p + k.yxy * e) + k.xxx * shape(p + k.xxx * e));
+  vec3 sum = vec3(0.0);
+  n = vec3(0.0, 1.0, 0.0);
+  ao = 1.0;
+  for (int i = 0; i < 5 * uOne; i++) {
+    vec3 o = i == 0 ? k.xyy : i == 1 ? k.yyx : i == 2 ? k.yxy : k.xxx;
+    float d = shape(i < 4 ? p + o * e : p + n * 0.25);
+    if (i < 4) sum += o * d;
+    if (i == 3) n = normalize(sum);
+    if (i == 4) ao = clamp(0.4 + 0.6 * d / 0.25, 0.0, 1.0);
+  }
 }
 
 vec3 aces(vec3 x) {
@@ -187,7 +196,9 @@ void main() {
   // Hladina ořízne spodek (obrys u vody jemně, přes pixel).
   cover *= smoothstep(-pix * bestT, pix * bestT, p.y);
   if (cover <= 0.0) discard;
-  vec3 n = normalAt(p, max(pix * bestT * 0.7, 0.01));
+  vec3 n;
+  float aoShape;
+  surfaceInfo(p, max(pix * bestT * 0.7, 0.01), n, aoShape);
   vec3 wn = fwd * n.x + vec3(0.0, n.y, 0.0) + side * n.z;   // normála ve světě
 
   // Vápenec: textura skutečné horniny, lišejníky, u vody mokrý tmavý pruh a řasy.
@@ -229,7 +240,7 @@ void main() {
       if (s > 12.0) break;
     }
   }
-  float ao = clamp(0.4 + 0.6 * shape(p + n * 0.25) / 0.25, 0.0, 1.0) * mix(0.55, 1.0, smoothstep(0.0, 0.6, p.y));
+  float ao = aoShape * mix(0.55, 1.0, smoothstep(0.0, 0.6, p.y));
   vec3 zenith, horizon;
   palette(uSun.y, zenith, horizon);
   vec3 sky = mix(horizon, zenith, 0.5 + 0.5 * wn.y) * (0.6 + 0.4 * wn.y);
@@ -261,8 +272,8 @@ void main() {
   outColor = vec4(c * cover, cover);
 }`;
 
-export function createBoulders(gl, { map }) {
-  const program = createProgram(gl, VS, FS, 'boulders');
+export async function createBoulders(gl, { map }) {
+  const program = await createProgramAsync(gl, VS, FS, 'boulders');
   const list = boulderList();
   const vao = gl.createVertexArray();
   const buffer = gl.createBuffer();

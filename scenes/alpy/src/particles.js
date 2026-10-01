@@ -6,7 +6,7 @@
 // loukami u jezera vznášejí svatojánské mušky: drobná zelenožlutá světélka, která
 // pomalu bloudí, rozsvěcují se a zhasínají.
 
-import { createProgram } from '../../shared/gl.js';
+import { createProgramAsync } from '../../shared/gl.js';
 import { NOISE } from '../../shared/glsl.js';
 import { CAMERA, ATMOSPHERE } from './world.js';
 
@@ -78,8 +78,8 @@ void main() {
   outColor = vec4(base * light * shape * vAlpha, shape * vAlpha);
 }`;
 
-export function createParticles(gl, { random }) {
-  const program = createProgram(gl, VS, FS, 'particles');
+export async function createParticles(gl, { random }) {
+  const program = await createProgramAsync(gl, VS, FS, 'particles');
   const vao = gl.createVertexArray();
   const buffer = gl.createBuffer();
   const data = new Float32Array(MAX * FLOATS);

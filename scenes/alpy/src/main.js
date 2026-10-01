@@ -7,7 +7,7 @@
 import config from './config.js';
 import { createFrameLoop } from '../../shared/frame-loop.js';
 import { setupControls } from '../../shared/controls.js';
-import { rendererInfo, showSoftwareNotice } from '../../shared/gl.js';
+import { rendererInfo, showSoftwareNotice, compileTimes } from '../../shared/gl.js';
 import { createTerrain, loadHeightMap } from './terrain.js';
 import { createDisplay } from './display.js';
 import { createBirds } from './birds.js';
@@ -89,15 +89,20 @@ try {
   showError(new Error(`chybí výšková mapa terénu (scenes/alpy/assets): ${error.message}`));
   throw error;
 }
-const terrain = await createTerrain(gl, heightMap);
-console.warn(`Překlad shaderů terénu: ${createTerrain.compileMs} ms`);
-const display = createDisplay(gl);
+// Všechny shadery se překládají najednou na pozadí (grafický proces), stránka mezitím
+// odpovídá a ukazuje obrázek z minula. Synchronní překlad by ji zablokoval i na 20 s.
+const [terrain, display, boats, trees, boulders, particles, stars] = await Promise.all([
+  createTerrain(gl, heightMap),
+  createDisplay(gl),
+  createBoats(gl, { map: heightMap, random, config }),
+  createTrees(gl, { map: heightMap, random: randomGenerator(seed ^ 0x7f4a7c15) }),
+  createBoulders(gl, { map: heightMap }),
+  createParticles(gl, { random }),
+  createStars(gl, { url: new URL('../assets/hvezdy.bin', import.meta.url).href }),
+]);
 const birds = createBirds(gl, { config, random });
-const boats = createBoats(gl, { map: heightMap, random, config });
-const trees = createTrees(gl, { map: heightMap, random: randomGenerator(seed ^ 0x7f4a7c15) });
-const boulders = createBoulders(gl, { map: heightMap });
-const particles = createParticles(gl, { random });
-const stars = createStars(gl, { url: new URL('../assets/hvezdy.bin', import.meta.url).href });
+console.warn(`Překlad shaderů terénu: ${createTerrain.compileMs} ms`);
+console.warn('Překlad programů (ms): ' + compileTimes.map(([l, ms, how]) => `${l} ${ms} ${how}`).join(', '));
 
 const state = {
   view: [1, 1],

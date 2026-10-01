@@ -30,6 +30,11 @@ async function run(mode, action) {
 }
 
 export function createSnapshotCache(key) {
+  // Staré snímky jiných verzí smazat (mohou zachycovat chybu, která už je opravená).
+  run('readwrite', (store) => store.getAllKeys())
+    .then((keys) => keys.filter((k) => typeof k === 'string' && !k.startsWith(key.split('-')[0] + '-'))
+      .forEach((k) => run('readwrite', (store) => store.delete(k)).catch(() => {})))
+    .catch(() => {});
   let image = null;
   let lastSave = -Infinity;
   let saving = false;

@@ -32,7 +32,8 @@ document.documentElement.classList.toggle('in-app', inApp);
 const params = new URLSearchParams(location.search);
 const screenIndex = Math.max(0, Number.parseInt(params.get('screen') || '0', 10) || 0);
 // Obrázek z minula, dokud se scéna nepřipraví (jen v tapetě, ne v náhledu s parametry).
-const snapshotCache = createSnapshotCache(`obrazovka-${screenIndex}-${innerWidth}x${innerHeight}`);
+// Verze v klíči: po opravě chyby obrazu se staré (možná rozbité) snímky nepoužijí.
+const snapshotCache = createSnapshotCache(`v2-obrazovka-${screenIndex}-${innerWidth}x${innerHeight}`);
 const cacheAllowed = [...params.keys()].every((k) => k === 'screen');
 
 function randomGenerator(seed) {
@@ -460,10 +461,10 @@ function render() {
   birds.draw({ dpr: state.dpr, blend });
   state.frames++;
   // Hotová scéna: obrázek z minula zmizí a jednou za čas se uloží nový.
-  if (fullWeight >= 1 && !terrain.busy) {
-    snapshotCache.hide();
-    if (cacheAllowed && state.time - state.doneAt > 20) snapshotCache.maybeSave(canvas, state.time);
-  }
+  // Hotová scéna (nebo nejpozději po minutě): obrázek z minula zmizí. Nový se uloží
+  // jednou za čas, jen když je krajina dopočítaná i se stíny.
+  if (fullWeight >= 1 || state.time > 60) snapshotCache.hide();
+  if (fullWeight >= 1 && !terrain.busy && cacheAllowed && state.time - state.doneAt > 20) snapshotCache.maybeSave(canvas, state.time);
   if (state.frames === 1) document.documentElement.dataset.ready = 'true';
 }
 

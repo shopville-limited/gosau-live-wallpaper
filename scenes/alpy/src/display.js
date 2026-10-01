@@ -425,7 +425,10 @@ vec3 reflectionAt(vec3 P, vec3 r) {
         // čím víc plocha míří vzhůru, tím tmavší je v odrazu (hlavně blízké kameny a břeh).
         vec3 hn = normalize(texture(uNormal, huv).xyz + vec3(0.0, 1e-4, 0.0));
         float underside = mix(0.22, 1.0, 1.0 - smoothstep(0.35, 0.95, hn.y));
-        return hit * mix(underside, 1.0, smoothstep(0.3, 1.5, hi));
+        hit *= mix(underside, 1.0, smoothstep(0.3, 1.5, hi));
+        // Vzdálené zásahy (hory) zrcadlí přesně i obyčejné zrcadlení podle obzoru a
+        // paprsek by je mezi sousedními sloupci trefoval nahodile (schody). Plynule přejít.
+        return mix(hit, sceneAt(screenOf(r)), smoothstep(0.25, 0.6, hi));
       }
     }
     prev = s;
@@ -454,14 +457,26 @@ float wakeHeight(vec2 xz) {
   return h;
 }
 
+// Šum vlnek s hladkou interpolací (místo lineární): jeho náklon je spojitý, takže
+// odraz u kamery, kde jeden bod textury pokryje několik pixelů, nemá hranaté bloky.
+float rippleNoise(vec2 uv) {
+  vec2 x = uv * 512.0 - 0.5;
+  vec2 i = floor(x), f = x - i;
+  f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  vec2 t = (i + 0.5) / 512.0, d = vec2(1.0 / 512.0, 0.0);
+  float a = texture(uNoise, t).g, b = texture(uNoise, t + d.xy).g;
+  float c = texture(uNoise, t + d.yx).g, e = texture(uNoise, t + d.xx).g;
+  return mix(mix(a, b, f.x), mix(c, e, f.x), f.y);
+}
+
 vec3 waterColor(vec3 rd, float dist) {
   vec3 P = vec3(0.0, CAMERA_HEIGHT, 0.0) + rd * dist;
   // Vítr čeří hladinu ve dvou měřítkách; poryv přidá tmavé „kočičí tlapky“.
   vec2 w1 = P.xz * 5.0 + vec2(uTime * 0.010, uTime * 0.004);
   vec2 w2 = P.xz * 13.0 - vec2(uTime * 0.006, uTime * 0.013);
   float e = 1.5 / 512.0;
-  float a0 = texture(uNoise, w1).g, ax = texture(uNoise, w1 + vec2(e, 0.0)).g, az = texture(uNoise, w1 + vec2(0.0, e)).g;
-  float b0 = texture(uNoise, w2).g, bx = texture(uNoise, w2 + vec2(e, 0.0)).g, bz = texture(uNoise, w2 + vec2(0.0, e)).g;
+  float a0 = rippleNoise(w1), ax = rippleNoise(w1 + vec2(e, 0.0)), az = rippleNoise(w1 + vec2(0.0, e));
+  float b0 = rippleNoise(w2), bx = rippleNoise(w2 + vec2(e, 0.0)), bz = rippleNoise(w2 + vec2(0.0, e));
   float paws = smoothstep(0.45, 0.75, texture(uNoise, P.xz * 0.9 - vec2(uTime * 0.03, 0.0)).r) * uGust;
   // Hladina není všude stejně zčeřená: klidné zrcadlové plochy (slicky) se pomalu
   // posouvají mezi zčeřenými pásy.

@@ -113,6 +113,12 @@ void main() {
     lit *= mix(0.45, 1.0, smoothstep(0.0, 0.7, y));
     float needles = 0.7 + 0.6 * hash12(floor(gl_FragCoord.xy * 0.5) + vSeed * 91.0);
     lit *= needles;
+    // Objem kužele: střed koruny míří k oku a dostává víc světla oblohy, okraje se stáčejí
+    // pryč a tmavnou; uvnitř koruny mezi větvemi je stín (strom pak není plochá kulisa).
+    float across01 = clamp(abs(x) / max(width, 0.05), 0.0, 1.0);
+    float round = sqrt(max(0.0, 1.0 - across01 * across01));
+    lit *= 0.6 + 0.55 * round;
+    lit *= mix(0.55, 1.0, smoothstep(0.15, 0.6, across01 + (1.0 - tier) * 0.5));
     float hue = fract(vSeed * 7.3);
     color = mix(vec3(0.014, 0.032, 0.024), vec3(0.026, 0.040, 0.016), hue);
     if (vKind > 0.5) {

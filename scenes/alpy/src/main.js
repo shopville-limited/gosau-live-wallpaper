@@ -470,11 +470,12 @@ function render() {
   // Hotová scéna (nebo nejpozději po minutě): obrázek z minula zmizí. Nový se uloží
   // jednou za čas, jen když je krajina dopočítaná i se stíny.
   if (fullWeight >= 1 || state.time > 60) snapshotCache.hide();
-  if (fullWeight >= 1 && !terrain.busy && cacheAllowed && state.time - state.doneAt > 20) snapshotCache.maybeSave(canvas, state.time);
+  if (fullWeight >= 1 && !terrain.busy && !trees.planting && cacheAllowed && state.time - state.doneAt > 20) snapshotCache.maybeSave(canvas, state.time);
   if (state.frames === 1) document.documentElement.dataset.ready = 'true';
 }
 
 function frame(dt) {
+  trees.pump(6);
   current = sky(currentDate());
   state.accumulator += dt;
   let steps = 0;
@@ -719,7 +720,7 @@ window.alpy = {
 window.sceneCheck = (phase) => {
   if (phase === 'snimky') return state.frames;
   // Krajina dopočítaná v plném rozlišení, stíny hotové a prolnuté (pro snímky testu).
-  if (phase === 'hotovo') return terrain.materialDone && !terrain.busy && state.doneAt !== null && state.time - state.doneAt > 1.5;
+  if (phase === 'hotovo') return terrain.materialDone && !terrain.busy && !trees.planting && state.doneAt !== null && state.time - state.doneAt > 1.5;
   if (phase === 'kurzor') {
     // Cena běžného snímku: měří se, až je krajina dopočítaná a stíny hotové
     // (dopočítávání na pozadí je rozložené do snímků záměrně a sem nepatří).

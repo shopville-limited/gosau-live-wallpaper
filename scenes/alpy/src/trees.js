@@ -483,12 +483,31 @@ export function createTrees(gl, { map, random }) {
     return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
   };
 
-  /** Rozmístí stromy v zorném poli (jednou, pro daný výhled). */
+  // Rozmisťování je rozdělené do dávek (generátor, dávka po každé řadě), ať nezablokuje
+  // kreslení: s podrostem a trávou trvá celé i desítky sekund.
+  let planting = null;
+
+  /** Rozmístí stromy v zorném poli (jednou, pro daný výhled), postupně v dávkách. */
   function plant(world) {
+    planting = plantSteps(world);
+  }
+
+  /** Pokračuje v rozmisťování nejvýš budget ms (volá se každý snímek). */
+  function pump(budget = 6) {
+    if (!planting) return;
+    const end = performance.now() + budget;
+    while (performance.now() < end) {
+      if (planting.next().done) { planting = null; return; }
+    }
+  }
+
+  function* plantSteps(world) {
+    const started = performance.now();
     const list = [];
     const step = 0.0072;
     const halfWidth = (world.aspect * world.span) / 2 + 0.05;
     for (let z = 0.06; z < TREE_NEAR; z += step) {
+      yield;
       for (let x = -halfWidth * z - 0.02; x < halfWidth * z + 0.02; x += step) {
         const px = x + (random() - 0.5) * step, pz = z + (random() - 0.5) * step;
         if (Math.hypot(px, pz) >= TREE_NEAR) continue;
@@ -563,6 +582,7 @@ export function createTrees(gl, { map, random }) {
     }
     // Rákosí a ostřice na mělčinách podél břehu (do 1 km), v pásech, ne všude.
     for (let z = 0.08; z < 1.0; z += 0.002 * (1 + z * 3)) {
+      yield;
       const reedStep = 0.002 * (1 + z * 3);
       for (let x = -halfWidth * z - 0.01; x < halfWidth * z + 0.01; x += reedStep) {
         const px = x + (random() - 0.5) * reedStep, pz = z + (random() - 0.5) * reedStep;
@@ -576,6 +596,7 @@ export function createTrees(gl, { map, random }) {
     // Trsy trávy a kvítí na loukách (do 900 m), ne v hustém lese ani ve skalách. Dál od
     // kamery řidší a větší (na obrazovce stejně husté), ať jich není zbytečně mnoho.
     for (let z = 0.06; z < 0.9; z += 0.0016 * (1 + z * 2)) {
+      yield;
       const grassStep = 0.0016 * (1 + z * 2);
       for (let x = -halfWidth * z - 0.01; x < halfWidth * z + 0.01; x += grassStep) {
         const px = x + (random() - 0.5) * grassStep, pz = z + (random() - 0.5) * grassStep;
@@ -601,6 +622,7 @@ export function createTrees(gl, { map, random }) {
     count = list.length;
     const kinds = [0, 0, 0, 0, 0, 0, 0];
     for (const t of list) kinds[t[6]]++;
+    console.warn(`Vegetace rozmístěna za ${((performance.now() - started) / 1000).toFixed(1)} s (v dávkách, kreslení běží dál)`);
     console.warn(`Vegetace: smrků ${kinds[0]}, modřínů ${kinds[1]}, buků ${kinds[2]}, keřů ${kinds[3]}, trsů trávy ${kinds[4]}, kmenů a pařezů ${kinds[5]}, trsů rákosí ${kinds[6]}`);
     // Zdroje padajícího listí a sněhu z větví (blízké stromy, km): x, y koruny, z, druh.
     // Louky pro svatojánské mušky: trsy trávy blízko kamery.
@@ -616,6 +638,8 @@ export function createTrees(gl, { map, random }) {
   return {
     plant,
     get count() { return count; },
+    pump,
+    get planting() { return planting !== null; },
     /** Odraz stromů a rákosí v jezeře, po posledním průchodu (rovnou do obrazovky). */
     drawReflection(o) {
       if (!count || !o.scene) return;

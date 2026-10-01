@@ -3,6 +3,8 @@
 // převislých větví, kmen, světlou stranu ke slunci, stín a pohupování ve větru.
 // Kreslí se do HDR obrazu scény po terénu; za terénem se schovají podle hloubky G-bufferu.
 // Dál od kamery zůstává les jako součást výškové mapy (terrain.js, uTreeNear).
+// K tomu podrost (borůvčí, kapradí, mladé smrčky) u paty stromů a na okraji lesa
+// a trsy trávy s kvítím na loukách blízko kamery; všechno se vlní ve vlnách poryvů.
 
 import { createProgram } from '../../shared/gl.js';
 import { NOISE } from '../../shared/glsl.js';
@@ -14,7 +16,7 @@ const FLOATS = 8;               // x, y (země), z, výška, šířka, semínko,
 const VS = /* glsl */ `#version 300 es
 precision highp float;
 in vec4 aBase;      // x, y, z země (km), výška stromu (km)
-in vec4 aShape;     // šířka (km), semínko, druh (0 smrk, 1 modřín, 2 buk), 1 = ve strmém svahu
+in vec4 aShape;     // šířka (km), semínko, druh (0 smrk, 1 modřín, 2 buk, 3 keř, 4 tráva), 1 = ve strmém svahu
 uniform float uTime;
 uniform float uGust;
 out vec2 vLocal;    // -1..1 napříč, 0..1 odspodu
@@ -39,8 +41,13 @@ void main() {
   float tall = aBase.w, wide = aShape.x;
   vec3 view = normalize(base - vec3(0.0, CAMERA_HEIGHT, 0.0));
   vec3 across = normalize(vec3(view.z, 0.0, -view.x));
-  // Vítr: špička se pohupuje víc než spodek.
-  float sway = sin(uTime * (0.9 + aShape.y * 0.6) + aShape.y * 40.0) * (0.02 + 0.05 * uGust) * c.y * c.y;
+  // Vítr: špička se pohupuje víc než spodek. Poryv přechází přes les jako vlna (stromy
+  // na návětrné straně se ohnou dřív), tráva a keře se vlní víc a rychleji.
+  float wave = 0.5 + 0.5 * sin(base.x * 260.0 + base.z * 90.0 - uTime * 1.6);
+  float gust = uGust * (0.35 + 0.65 * wave * wave);
+  float small = step(2.5, aShape.z);
+  float rate = mix(0.9 + aShape.y * 0.6, 2.2 + aShape.y * 1.5, small);
+  float sway = sin(uTime * rate + aShape.y * 40.0 + base.x * 300.0) * (mix(0.02, 0.08, small) + mix(0.05, 0.18, small) * gust + 0.03 * wave * small) * c.y * c.y;
   vec3 q = base + across * (c.x * wide * 0.5 + sway * wide) + vec3(0.0, c.y * tall, 0.0);
   vLocal = c;
   vWorld = q;
@@ -85,8 +92,54 @@ void main() {
   float width;
   vec3 color;
   float lit;
-  bool broadleaf = vKind > 1.5;
-  if (!broadleaf) {
+  bool broadleaf = vKind > 1.5 && vKind < 2.5;
+  float summer = (1.0 - uWinter) * (1.0 - uAutumn) * (1.0 - 0.6 * uSpring);
+  if (vKind > 3.5) {
+    // Trs trávy: sedm stébel z jednoho místa do vějíře, na některých kvítek.
+    if (uWinter > 0.5) discard;                       // pod sněhem
+    float best = 9.0, tipFlower = 9.0;
+    vec2 p = vec2(x, y);
+    for (int i = 0; i < 7; i++) {
+      float fi = float(i);
+      float h = hash12(vec2(fi, vSeed * 61.0));
+      vec2 a = vec2((h - 0.5) * 0.5, 0.0);
+      vec2 b = vec2(a.x + (h - 0.5) * 1.1 + 0.25 * sin(fi * 2.1 + vSeed * 9.0), 0.55 + 0.45 * hash12(vec2(fi + 7.0, vSeed * 13.0)));
+      vec2 pa = p - a, ba = b - a;
+      float t = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+      float d = length(pa - ba * t) - 0.05 * (1.0 - t);
+      best = min(best, d);
+      if (hash12(vec2(fi + 3.0, vSeed * 29.0)) < 0.35) tipFlower = min(tipFlower, length(p - b) - 0.09);
+    }
+    bool flower = tipFlower < 0.0 && summer > 0.6;
+    if (best > 0.0 && !flower) discard;
+    width = 1.0;
+    vec3 grass = mix(vec3(0.05, 0.09, 0.025), vec3(0.09, 0.12, 0.035), fract(vSeed * 5.1));
+    grass = mix(grass, vec3(0.13, 0.11, 0.05), uAutumn * 0.8);
+    color = grass * (0.7 + 0.5 * y);
+    lit = 0.45 + 0.55 * y;
+    if (flower) {
+      float pick = fract(vSeed * 17.3);
+      // Alpské kvítí: kopretiny, pryskyřníky, zvonky, hvozdíky.
+      color = pick < 0.35 ? vec3(0.75, 0.75, 0.7) : pick < 0.6 ? vec3(0.75, 0.6, 0.05) : pick < 0.85 ? vec3(0.25, 0.15, 0.55) : vec3(0.6, 0.15, 0.3);
+      lit = 0.9;
+    }
+  } else if (vKind > 2.5) {
+    // Keř podrostu: nízký hrbolatý polštář (borůvčí, kapradí nebo mladý smrček).
+    float pick = fract(vSeed * 3.7);
+    vec2 q = vec2(x, (y - 0.42) / 0.55);
+    float blob = length(q) + 0.3 * gnoise(vec2(x, y) * 6.0 + vSeed * 30.0) + 0.15 * gnoise(vec2(x, y) * 17.0 + vSeed);
+    if (blob > 1.0 || y < 0.0) discard;
+    width = 1.0;
+    float leafNoise = gnoise(vec2(x, y) * 22.0 + vSeed * 7.0) * 0.5 + 0.5;
+    // Na podzim borůvčí zrudne do vínova a kapradí zhnědne (tlumeně, jako na fotce).
+    vec3 blueberry = mix(vec3(0.018, 0.034, 0.014), vec3(0.075, 0.025, 0.018), uAutumn);
+    vec3 fern = mix(vec3(0.035, 0.06, 0.018), vec3(0.09, 0.06, 0.025), uAutumn);
+    vec3 young = vec3(0.015, 0.032, 0.022);
+    color = pick < 0.45 ? blueberry : pick < 0.8 ? fern : young;
+    color = mix(color, vec3(0.6, 0.62, 0.66), uWinter * smoothstep(0.3, 0.8, y + 0.3 * leafNoise));
+    color *= 0.75 + 0.5 * leafNoise;
+    lit = (0.3 + 0.7 * smoothstep(-0.6, 0.8, q.y)) * (0.8 + 0.3 * leafNoise);
+  } else if (!broadleaf) {
     // Smrk (a modřín): kužel z pater převislých větví, každé patro zubaté do stran.
     float tiers = 9.0 + floor(vSeed * 6.0);
     float t = y * tiers + vSeed * 3.0;
@@ -101,9 +154,14 @@ void main() {
     // Drobné zuby jehličí na obrysu.
     width *= 0.92 + 0.08 * gnoise(vec2(y * 90.0 + vSeed * 13.0, side));
     // Kmen dole mezi větvemi.
-    float trunk = step(abs(x), 0.035) * step(y, 0.12);
+    // Staré stromy mají dole holý kmen (spodní větve opadaly), některé suchou špičku.
+    float old = hash12(vec2(vSeed * 41.0, 5.0));
+    float bare = old > 0.6 ? mix(0.08, 0.28, (old - 0.6) / 0.4) : 0.06;
+    bool deadTop = old > 0.88 && vKind < 0.5;
+    if (deadTop && y > 0.86) width = 0.06 * (1.0 - y) / 0.14 + 0.02 * step(fract(y * 28.0), 0.3) * (1.0 - y) * 6.0;
+    float trunk = step(abs(x), 0.035) * step(y, bare + 0.06);
     if (abs(x) > width && trunk < 0.5) discard;
-    if (y < 0.06 && trunk < 0.5) discard;
+    if (y < bare && trunk < 0.5) discard;
     // Světlo: horní strana větve a strana ke slunci světlejší, spodek patra ve stínu.
     vec3 view = normalize(vWorld - vec3(0.0, CAMERA_HEIGHT, 0.0));
     vec3 across = normalize(vec3(view.z, 0.0, -view.x));
@@ -120,7 +178,12 @@ void main() {
     lit *= 0.6 + 0.55 * round;
     lit *= mix(0.55, 1.0, smoothstep(0.15, 0.6, across01 + (1.0 - tier) * 0.5));
     float hue = fract(vSeed * 7.3);
-    color = mix(vec3(0.014, 0.032, 0.024), vec3(0.026, 0.040, 0.016), hue);
+    // Smrky se liší: modrozelené, tmavé i žlutozelené.
+    color = mix(vec3(0.012, 0.030, 0.026), vec3(0.030, 0.042, 0.015), hue);
+    // Letošní výhonky na koncích větví v květnu a červnu: světle zelené špičky.
+    float tips = smoothstep(0.7, 0.95, across01) * smoothstep(0.4, 0.9, 1.0 - tier);
+    color = mix(color, vec3(0.07, 0.12, 0.03), tips * uSpring * 0.8);
+    if (deadTop && y > 0.86) color = vec3(0.06, 0.05, 0.045);
     if (vKind > 0.5) {
       vec3 larch = mix(vec3(0.035, 0.065, 0.025), vec3(0.055, 0.10, 0.030), uSpring);
       larch = mix(larch, vec3(0.13, 0.115, 0.035), uAutumn);
@@ -167,6 +230,9 @@ void main() {
     float leafNoise = gnoise(p * 34.0 + vSeed * 19.0) * 0.5 + 0.5;
     // Obrys chomáče roztřepený do listů; v zimě bez listí.
     bool leaf = uWinter < 0.6 && best < 1.0 - 0.3 * smoothstep(0.5, 1.0, best) * leafNoise;
+    // Koruna není plná: mezi chomáči listí prosvítá nebe a větve (víc na okrajích).
+    float gap = gnoise(p * 7.0 + vSeed * 23.0) * 0.5 + 0.5;
+    if (leaf && gap > 0.74 - 0.25 * smoothstep(0.3, 0.9, best)) leaf = false;
     // Kmen se nahoře větví ke shlukům (větve se ztenčují).
     vec2 lp = vec2(x, y);
     float wood = y < 0.42 ? abs(x) - 0.065 * (1.0 - 0.4 * y) : 1.0;
@@ -221,6 +287,7 @@ out vec2 vBaseUv;
 ${NOISE}
 ${CAMERA}
 uniform vec3 uSun;
+uniform float uAmbient;   // 1 = zastínění pod korunou (kruh kolem paty), 0 = stín od slunce
 const vec2 CORNERS[6] = vec2[6](vec2(-1, 0), vec2(1, 0), vec2(1, 1), vec2(-1, 0), vec2(1, 1), vec2(-1, 1));
 vec4 project(vec3 q) {
   vec3 d = q - vec3(0.0, CAMERA_HEIGHT, 0.0);
@@ -231,6 +298,21 @@ vec4 project(vec3 q) {
 void main() {
   vec2 c = CORNERS[gl_VertexID];
   vec3 base = aBase.xyz + vec3(0.0, 0.0008, 0.0);
+  if (uAmbient > 0.5) {
+    // Pod korunou je země v trvalém stínu (jehličí, mech): kruh o poloměru koruny.
+    // Skvrna natočená ke kameře (kamera stojí nízko, vodorovný kruh na svahu nad ní by
+    // viděla jen z boku jako čáru).
+    float r = aShape.x * (aShape.z > 2.5 ? 0.6 : 0.8);
+    vec3 view = normalize(base - vec3(0.0, CAMERA_HEIGHT, 0.0));
+    vec3 across = normalize(vec3(view.z, 0.0, -view.x));
+    vec3 q = base + across * c.x * r + vec3(0.0, (c.y * 2.0 - 1.0) * r * 0.45 - 0.0004, 0.0);
+    vLocal = vec2(c.x, c.y * 2.0 - 1.0);
+    vDistance = length(q - vec3(0.0, CAMERA_HEIGHT, 0.0));
+    vBaseUv = project(aBase.xyz).xy * 0.5 + 0.5;
+    gl_Position = project(q);
+    if (aShape.z > 3.5) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
   vec2 away = -normalize(uSun.xz + 1e-5);
   float elevation = max(uSun.y, 0.08);
   float len = min(aBase.w / elevation * sqrt(1.0 - elevation * elevation), aBase.w * 6.0);
@@ -242,7 +324,8 @@ void main() {
   vBaseUv = project(aBase.xyz).xy * 0.5 + 0.5;
   gl_Position = project(q);
   // Klín stínu počítá s rovnou zemí; ve strmém svahu by se protáhl do dlouhých čar.
-  if (aShape.w > 0.5) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+  // Keře a tráva vlastní klín nevrhají (jsou nízko, stín splyne se zemí).
+  if (aShape.w > 0.5 || aShape.z > 2.5) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }`;
 
 const SHADOW_FS = /* glsl */ `#version 300 es
@@ -253,6 +336,7 @@ in vec2 vBaseUv;
 uniform sampler2D uDepth;
 uniform sampler2D uShadow;
 uniform float uStrength;
+uniform float uAmbient;
 out vec4 outColor;
 void main() {
   // Jen na viditelné zemi (ne na kopci před ní ani na obloze).
@@ -260,6 +344,11 @@ void main() {
   if (a <= 0.0 || a > 900.0) discard;
   float terrain = a - 100.0 * floor(a / 100.0);
   if (abs(terrain - vDistance) > 0.006 + 0.02 * vDistance) discard;
+  if (uAmbient > 0.5) {
+    float k = 1.0 - uStrength * (1.0 - smoothstep(0.35, 1.0, length(vLocal)));
+    outColor = vec4(k, k, k, 1.0);
+    return;
+  }
   // Kuželovitý stín smrku: u paty široký, ke špičce se zužuje.
   float w = (1.0 - vLocal.y) * 0.9 + 0.1;
   float inside = 1.0 - smoothstep(w * 0.8, w, abs(vLocal.x));
@@ -337,7 +426,15 @@ export function createTrees(gl, { map, random }) {
           const tan = Math.hypot(gx, gz);
           if (tan > 0.8 && tan < 3.2) cling = 0.75 * smooth(0.4, 0.62, vnoise(px * 30 + 3, pz * 30 + 9) * 0.7 + vnoise(px * 120, pz * 120) * 0.3);
         }
-        if (random() > Math.max(density, cling)) continue;
+        if (random() > Math.max(density, cling)) {
+          // Okraj lesa: kde hustota teprve začíná, lem keřů a mladých stromků.
+          const edge = Math.max(density, cling);
+          if (edge > 0.08 && edge < 0.45 && random() < 0.55) {
+            const size = 0.0012 + random() * 0.0018;
+            list.push([px, ground - 0.0002, pz, size, size * (1.4 + random()), random(), 3, 0]);
+          }
+          continue;
+        }
         const onSlope = cling > density ? 1 : 0;
         // Listnáče (buk, javor) hlavně níž u jezera ve skupinách, modříny roztroušeně.
         const low = ground < 0.25 ? 1 - ground / 0.25 : 0;
@@ -348,6 +445,34 @@ export function createTrees(gl, { map, random }) {
         const tall = (0.013 + 0.017 * age * age * (3 - 2 * age)) * (kind === 2 ? 0.9 : 1);
         const wide = tall * (kind === 2 ? 0.6 : 0.36 + random() * 0.08);
         list.push([px, ground - 0.0008, pz, tall, wide, random(), kind, onSlope]);
+        // Podrost u paty stromu: borůvčí, kapradí, mladý smrček (jeden až dva keře).
+        const shrubs = random() < 0.7 ? (random() < 0.4 ? 2 : 1) : 0;
+        for (let k = 0; k < shrubs; k++) {
+          const a = random() * Math.PI * 2, r = wide * (0.35 + random() * 0.6);
+          const sx = px + Math.cos(a) * r, sz = pz + Math.sin(a) * r;
+          const sg = map.sampleFine(sx, sz);
+          if (sg < 0.0045) continue;
+          const size = 0.0009 + random() * 0.0016;
+          list.push([sx, sg - 0.0002, sz, size, size * (1.4 + random() * 1.0), random(), 3, 0]);
+        }
+      }
+    }
+    // Trsy trávy a kvítí na loukách (do 900 m), ne v hustém lese ani ve skalách. Dál od
+    // kamery řidší a větší (na obrazovce stejně husté), ať jich není zbytečně mnoho.
+    for (let z = 0.06; z < 0.9; z += 0.0016 * (1 + z * 2)) {
+      const grassStep = 0.0016 * (1 + z * 2);
+      for (let x = -halfWidth * z - 0.01; x < halfWidth * z + 0.01; x += grassStep) {
+        const px = x + (random() - 0.5) * grassStep, pz = z + (random() - 0.5) * grassStep;
+        const ground = map.sampleFine(px, pz);
+        if (ground < 0.0038) continue;                          // pláž a voda
+        if (map.sampleForest(px, pz) > 0.6) continue;            // hustý les
+        const e = 0.003;
+        const gx = (map.sampleFine(px + e, pz) - map.sampleFine(px - e, pz)) / (2 * e);
+        const gz = (map.sampleFine(px, pz + e) - map.sampleFine(px, pz - e)) / (2 * e);
+        if (Math.hypot(gx, gz) > 1.2) continue;                 // skály a strmé svahy
+        if (random() > 0.9 * smooth(0.2, 0.55, vnoise(px * 60 + 5, pz * 60 + 1) + 0.25)) continue;
+        const size = (0.0004 + random() * 0.0005) * (1 + z * 1.5);
+        list.push([px, ground - 0.0001, pz, size, size * (1.3 + random() * 0.8), random(), 4, 0]);
       }
     }
     // Odzadu dopředu, ať bližší strom překryje vzdálenější.
@@ -358,6 +483,9 @@ export function createTrees(gl, { map, random }) {
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
     count = list.length;
+    const kinds = [0, 0, 0, 0, 0];
+    for (const t of list) kinds[t[6]]++;
+    console.warn(`Vegetace: smrků ${kinds[0]}, modřínů ${kinds[1]}, buků ${kinds[2]}, keřů ${kinds[3]}, trsů trávy ${kinds[4]}`);
   }
 
   const nearest = gl.createSampler();
@@ -400,6 +528,25 @@ export function createTrees(gl, { map, random }) {
       gl.uniform1f(u.uSpring, o.season.spring);
       // Nejdřív stíny na zem (násobení barvy), pak stromy.
       const sunUp = Math.min(1, Math.max(0, (o.sun[1] - 0.01) / 0.08));
+      {
+        // Zastínění pod korunami vždy (i bez slunce), pak stíny od slunce.
+        const su = shadowProgram.u;
+        gl.useProgram(shadowProgram.program);
+        gl.uniform1i(su.uDepth, 0);
+        gl.uniform1i(su.uShadow, 1);
+        gl.uniform1f(su.uAspect, w.aspect);
+        gl.uniform1f(su.uHorizon, w.horizon);
+        gl.uniform1f(su.uSpan, w.span);
+        gl.uniform1f(su.uMirror, w.mirror ? 1 : 0);
+        gl.uniform3f(su.uSun, ...o.sun);
+        gl.uniform1f(su.uAmbient, 1);
+        gl.uniform1f(su.uStrength, 0.55);
+        gl.enable(gl.BLEND);
+        gl.blendFuncSeparate(gl.ZERO, gl.SRC_COLOR, gl.ZERO, gl.ONE);
+        gl.bindVertexArray(shadowVao);
+        gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, count);
+        gl.uniform1f(su.uAmbient, 0);
+      }
       if (sunUp > 0) {
         const su = shadowProgram.u;
         gl.useProgram(shadowProgram.program);

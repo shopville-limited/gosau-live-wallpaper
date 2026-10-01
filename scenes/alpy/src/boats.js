@@ -123,7 +123,9 @@ vec2 person(vec3 p, vec3 hip, float lean, vec3 handL, vec3 handR, float jacket, 
 
 // Pádlo kánoe: horní ruka na rukojeti, dolní na žerdi, list pod ní.
 vec2 canoePaddle(vec3 p, float x0, float side, float cycle, float jacket) {
-  float reach = cos(cycle);                 // 1 = vpředu (záběr), -1 = vzadu
+  // Ve vodě (sin < 0) jde list zepředu dozadu (reach 1 → -1) a loď tlačí dopředu,
+  // nad vodou (sin > 0) se vrací dopředu.
+  float reach = -cos(cycle);                // 1 = vpředu (záběr), -1 = vzadu
   float lift = max(0.0, sin(cycle));        // návrat nad vodou
   vec3 hip = vec3(x0, 0.1, 0.0);
   vec3 top = vec3(x0 + 0.15 + 0.3 * reach, 1.0 + 0.12 * lift, side * 0.1);
@@ -207,7 +209,8 @@ vec2 kayak(vec3 p) {
   // Dvoulisté pádlo: střídavě zabírá vlevo a vpravo.
   vec3 hip = vec3(0.0, 0.02, 0.0);
   vec3 c = hip + vec3(0.42, 0.52, 0.0);
-  vec3 d = normalize(vec3(0.3 * cos(gPhase), 0.55 * sin(gPhase), 1.0));
+  // List, který je dole ve vodě, se posouvá zepředu dozadu (záběr táhne loď vpřed).
+  vec3 d = normalize(vec3(-0.3 * cos(gPhase), 0.55 * sin(gPhase), 1.0));
   r = U(r, vec2(sdCapsule(p, c - d * 1.1, c + d * 1.1, 0.015), M_BLACK));
   r = U(r, vec2(min(sdCapsule(p, c + d * 0.82, c + d * 1.1, 0.07), sdCapsule(p, c - d * 1.1, c - d * 0.82, 0.07)), M_HULL));
   return U(r, person(p, hip, 0.06, c - d * 0.33, c + d * 0.33, M_JACKET, 1.0));

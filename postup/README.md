@@ -362,3 +362,21 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Blízké smrky s objemem koruny (zvětšeno 2×)](60-blizke-smrky-s-objemem-koruny-zvetseno-2.jpg)
 
+## 61. Les s podrostem, stínem pod korunami, kvítím na okraji louky a prosvítajícími buky
+
+*2026-10-01 10:30*
+
+![Les s podrostem, stínem pod korunami, kvítím na okraji louky a prosvítajícími buky](61-les-s-podrostem-stinem-pod-korunami-kvit.jpg)
+
+## 62. Detail lesa: borůvčí, kapradí, staré smrky s holým kmenem, kvítí (zvětšeno 2×)
+
+*2026-10-01 10:31*
+
+![Detail lesa: borůvčí, kapradí, staré smrky s holým kmenem, kvítí (zvětšeno 2×)](62-detail-lesa-boruvci-kapradi-stare-smrky.jpg)
+
+## 63. Les v zimě: keře pod sněhem
+
+*2026-10-01 10:40*
+
+![Les v zimě: keře pod sněhem](63-les-v-zime-kere-pod-snehem.jpg)
+

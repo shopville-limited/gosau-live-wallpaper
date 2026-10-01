@@ -1,0 +1,12 @@
+{
+  "name": "moje-tapeta",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Živá tapeta pro Windows: Gosausee a Dachstein v Rakouských Alpách.",
+  "scripts": {
+    "start": "node serve.mjs",
+    "check": "node host/tests/check.mjs"
+  }
+}

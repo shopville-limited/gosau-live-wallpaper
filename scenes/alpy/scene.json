@@ -1,0 +1,10 @@
+{
+  "title": "Rakouské Alpy",
+  "background": "#2b2a3a",
+  "actions": [
+    { "id": "ptaci", "title": "Hejno ptáků" },
+    { "id": "vitr", "title": "Poryv větru" },
+    { "id": "den", "title": "Přehrát den" },
+    { "id": "sneh", "title": "Sněžení" }
+  ]
+}

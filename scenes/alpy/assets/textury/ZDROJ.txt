@@ -1,0 +1,6 @@
+Textury skal pocházejí z ambientCG (https://ambientcg.com), licence CC0 1.0 (volné dílo):
+  vapenec-barva.jpg, vapenec-normala.jpg  = Rock026 (1K, Color a NormalGL)
+  mech-barva.jpg, mech-normala.jpg        = Rock063 (1K, Color a NormalGL)
+  trava-barva.jpg                         = Grass004 (1K, Color)
+  lesni-puda-barva.jpg                    = Ground037 (1K, Color)
+  sterk-barva.jpg                         = Gravel041 (1K, Color)

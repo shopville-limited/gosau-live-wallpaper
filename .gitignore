@@ -1,0 +1,6 @@
+host/build/
+host/tests/out/
+host/tests/last.txt
+.playwright-mcp/
+node_modules/
+tools/.cache/

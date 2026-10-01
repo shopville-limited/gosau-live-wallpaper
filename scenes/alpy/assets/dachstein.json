@@ -1,0 +1,49 @@
+{
+  "columns": 1601,
+  "rows": 1121,
+  "detail": {
+    "columns": 1201,
+    "rows": 1001,
+    "spacing": 0.005,
+    "left": -3,
+    "near": -0.5
+  },
+  "spacing": 0.025,
+  "left": -20,
+  "near": -2,
+  "lakeLevel": 927.3,
+  "base": 900,
+  "scale": 0.1,
+  "camera": {
+    "lat": 47.532341,
+    "lon": 13.497573,
+    "azimuth": 128.26
+  },
+  "places": {
+    "dachstein": [
+      -0.0782,
+      10.336200000000002
+    ],
+    "gosaugletscher": [
+      -0.4645,
+      8.8159
+    ],
+    "bischofsmuetze": [
+      3.5132,
+      2.1031
+    ],
+    "gablonzerHuette": [
+      2.7919,
+      -1.2895
+    ],
+    "adamekHuette": [
+      0.432,
+      7.5893999999999995
+    ],
+    "lakeCenter": [
+      -0.07859999999999999,
+      0.8018
+    ]
+  },
+  "source": "Mapzen Terrain Tiles (AWS Open Data), pro Rakousko z DGM Österreich 10 m © data.gv.at / geoland.at, CC BY 4.0"
+}

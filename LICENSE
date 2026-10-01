@@ -1,0 +1,44 @@
+MIT License
+
+Copyright (c) 2026 Chase Lean
+Copyright (c) 2026 autoři projektu Moje tapeta
+
+Část kódu pochází z projektu Deskworlds (https://github.com/chaseleantj/deskworlds),
+který vydal Chase Lean pod licencí MIT:
+  - serve.mjs (převzato, upravena jen hláška při startu),
+  - scenes/shared/frame-loop.js (převzato beze změny),
+  - nativní část v host/ vychází z wallpaper/Wallpaper.swift a wallpaper/install.sh
+    (přepsáno z macOS do C# pro Windows: pravidla šetření energií, sledování kurzoru,
+    menu a příkazy pro snímek a znovunačtení).
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Knihovny WebView2 (Microsoft.Web.WebView2), které build.ps1 stahuje z nuget.org,
+mají vlastní licenci společnosti Microsoft a nejsou součástí tohoto repozitáře.
+
+Výšková data scény Alpy (scenes/alpy/assets) vycházejí z Mapzen Terrain Tiles
+(AWS Open Data), pro Rakousko z DGM Österreich 10 m © data.gv.at / geoland.at, CC BY 4.0.
+
+Katalog hvězd (scenes/alpy/assets/hvezdy.bin) vychází z Yale Bright Star Catalogue,
+5. vydání (Hoffleit & Warren), volné dílo.
+
+Skutečné počasí ve scéně Alpy stahuje za běhu z Open-Meteo (https://open-meteo.com),
+data pod licencí CC BY 4.0.
+
+Textury skal (scenes/alpy/assets/textury) jsou z ambientCG (Rock026, Rock063, Grass004, Ground037, Gravel041), licence CC0 1.0.

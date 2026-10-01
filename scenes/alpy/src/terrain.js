@@ -77,6 +77,15 @@ float forestAt(vec2 p) {
   return texture(uForestMap, (p - uMapRect.xy) / uMapRect.zw).r;
 }
 
+// Hustota lesa s roztřepeným okrajem: maska (25 m) by dala ostrou hranu proti skále,
+// šum ve dvou měřítkách (~60 m a ~15 m) z ní udělá jazyky, skupinky a osamělé stromy.
+float forestDensity(vec2 p) {
+  float f = forestAt(p);
+  float edge = 1.0 - abs(f - 0.33) / 0.33;          // jen kolem okraje
+  f += max(edge, 0.0) * (0.22 * gnoise(p * 16.0 + uSeed * 3.1) + 0.12 * gnoise(p * 65.0 + uSeed));
+  return smoothstep(0.12, 0.55, f);
+}
+
 // Koruny stromů v buňkách asi 7 m. Vrací výšku koruny (km), vzdálenost od středu kmene
 // (0 střed, 1 okraj koruny) a náhodné číslo stromu. Hustota lesa rozhoduje, kolik buněk
 // má strom; nad hranicí lesa jsou stromy nižší (kosodřevina).
@@ -189,7 +198,7 @@ float height(vec2 p, int octaves) {
     h += rocky * mix(0.02, 0.075, alpine) * (crags - 0.5) + 0.0015 * gnoise(p * 45.0 + uSeed);
     // Na okrajích lesa (u stěn a žlabů) jen řídce, ne osamělé šmouhy na skále.
     // U samé vody je štěrková pláž, stromy začínají až za ní.
-    float density = smoothstep(0.12, 0.55, forestAt(p)) * smoothstep(0.0035, 0.007, base);
+    float density = forestDensity(p) * smoothstep(0.0035, 0.007, base);
     // V pásmu překryvu koruny postupně vyrůstají (blízkých stromů naopak ubývá).
     if (density > 0.0) h += canopy(p, density, base).x * smoothstep(0.85, 1.0, length(p) / uTreeNear);
   }
@@ -254,7 +263,7 @@ float march(vec3 ro, vec3 rd) {
     if (h < 0.0003 * t) return t;
     if (t > 45.0) return -1.0;
     // U korun stromů (strmé kužely) jemnější krok, jinak paprsek kužel přeskočí.
-    float factor = h < 0.04 && forestAt(p.xz) > 0.12 ? 0.15 : 0.42;
+    float factor = h < 0.04 && forestAt(p.xz) > 0.06 ? 0.15 : 0.42;
     t += max(factor * h, 0.0008 * t);
   }
   return t;
@@ -485,7 +494,7 @@ Surface surfaceAt(vec3 p, float t) {
   }
 
   // Les podle masky (tools/terrain.mjs): koruny jsou skutečná výška terénu, tady jen barva.
-  float forestRaw = smoothstep(0.12, 0.55, forestAt(p.xz));
+  float forestRaw = forestDensity(p.xz);
   float forest = forestRaw * smoothstep(0.0035, 0.007, hc);
   float meadowShare = smoothstep(0.78, 0.92, detail) * 0.5 * (1.0 - smoothstep(0.15, 0.5, alt));
   float gaps = 1.0;
@@ -526,6 +535,12 @@ Surface surfaceAt(vec3 p, float t) {
     vec3 farForest = spruce * (0.8 + 0.4 * fine) + (larch - spruce) * larchShare + (beech - spruce) * beechShare;
     // Zdálky kresba korun: shluky stromů (20 m) a jednotlivé špičky (5 m) střídají světlo a stín.
     farForest *= (0.7 + 0.6 * (noise3(wp * 0.05) * 0.5 + 0.5)) * (0.75 + 0.5 * (noise3(wp * 0.2 + 4.0) * 0.5 + 0.5));
+    // Zdálky je les o něco světlejší a zelenější (mezi korunami prosvítá světlo, špičky
+    // se lesknou); tmavě modrou mu dodá až vzduch. Partie se liší odstínem po stovkách metrů.
+    float stand = noise3(wp * 0.006 + 21.0) * 0.5 + 0.5;
+    farForest *= mix(vec3(1.45, 1.55, 1.0), vec3(1.75, 1.8, 1.05), stand);
+    // Řídký okraj: mezi stromy prosvítá zem (kamení, tráva), ne tmavá plocha.
+    farForest = mix(albedo * 0.7, farForest, smoothstep(0.15, 0.7, forest));
     vec3 trees = mix(farForest, mix(floorColor, crownColor, onTree), crownFade);
     // V zimě sníh na větvích a na zemi mezi stromy.
     trees = mix(trees, vec3(0.62, 0.64, 0.68), uWinter * mix(0.2, mix(0.8, 0.3, onTree), crownFade));

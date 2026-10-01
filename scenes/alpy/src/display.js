@@ -894,6 +894,8 @@ export function createDisplay(gl) {
       if (o.trees && o.fullWeight >= 1) {
         o.trees.draw({ ...o, depth: o.terrain.full.albedo, shadow: o.shadows.to });
       }
+      // Padající listí a sníh z větví.
+      if (o.particles) o.particles.draw(o);
       // Balvany v popředí (3D) do obrazu scény.
       if (o.boulders) o.boulders.drawScene({ ...o, shadow: o.shadows.to });
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);

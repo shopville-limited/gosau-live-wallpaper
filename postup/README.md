@@ -380,3 +380,15 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Les v zimě: keře pod sněhem](63-les-v-zime-kere-pod-snehem.jpg)
 
+## 64. Plynulý přechod blízkých stromů do vzdáleného lesa
+
+*2026-10-01 16:30*
+
+![Plynulý přechod blízkých stromů do vzdáleného lesa](64-plynuly-prechod-blizkych-stromu-do-vzdal.jpg)
+
+## 65. Podzim: zlaté modříny, oranžové buky, vínové borůvčí, rákosí u břehu
+
+*2026-10-01 16:40*
+
+![Podzim: zlaté modříny, oranžové buky, vínové borůvčí, rákosí u břehu](65-podzim-zlate-modriny-oranzove-buky-vinov.jpg)
+

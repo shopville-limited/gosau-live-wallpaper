@@ -17,6 +17,7 @@ import { createWeather } from './weather.js';
 import { createStars } from './stars.js';
 import { createBoulders } from './boulders.js';
 import { createSnapshotCache } from './snapshot-cache.js';
+import { createParticles } from './particles.js';
 import { solarPosition, direction, moonPhase, moonDirection, seasonFor, skyFrame, MONTHS } from './sky-clock.js';
 
 const STEP = 1 / 60;
@@ -94,6 +95,7 @@ const birds = createBirds(gl, { config, random });
 const boats = createBoats(gl, { map: heightMap, random, config });
 const trees = createTrees(gl, { map: heightMap, random: randomGenerator(seed ^ 0x7f4a7c15) });
 const boulders = createBoulders(gl, { map: heightMap });
+const particles = createParticles(gl, { random });
 const stars = createStars(gl, { url: new URL('../assets/hvezdy.bin', import.meta.url).href });
 
 const state = {
@@ -370,6 +372,7 @@ function simulate(dt) {
   const tau = snow === 0 && current.season.winter < 0.5 && state.time >= state.snowUntil ? 1 : 6;
   state.snowfall += (snow - state.snowfall) * (1 - Math.exp(-dt / tau));
 
+  particles.step(dt, trees.sources, current.season, state.gust);
   boats.step(dt, current.sun, current.season.ice, state.wx ? state.wx.rain + state.wx.storm : 0);
 
   // Ptáci létají jen ve dne.
@@ -427,7 +430,7 @@ function render() {
     sun: current.sun, moon: current.moon, moonPhase: current.moonPhase,
     wakes: boats.wakes(),
     trees, season: current.season,
-    stars, boulders, date: current.date, sky: skyFrame(current.date, config.cas.sirka, config.cas.delka),
+    stars, boulders, particles, date: current.date, sky: skyFrame(current.date, config.cas.sirka, config.cas.delka),
     map: heightMap,
   });
   boulders.drawReflection({
@@ -479,6 +482,8 @@ const actions = {
   ptaci: () => birds.flock(),
   // Jen pro náhled z adresy (?akce=kavky): hejno kavek na nocoviště.
   kavky: () => birds.roost(),
+  // Jen pro náhled (?akce=listi): podzimní poryv, aby bylo listí vidět hned.
+  listi: () => { state.gust = 1; },
   // Jen pro náhled (?akce=boure): minuta bouřky s blesky.
   boure: () => { state.stormUntil = state.time + 60; state.nextStrike = 0.5; },
   vitr: () => { state.gust = 1; },
@@ -702,7 +707,7 @@ window.sceneCheck = (phase) => {
     // (dopočítávání na pozadí je rozložené do snímků záměrně a sem nepatří).
     const settled = terrain.materialDone && !terrain.busy;
     const ms = window.alpy.bench(10);
-    console.warn(`Snímek Alp: ${ms.toFixed(1)} ms, blízkých stromů ${trees.count}${settled ? '' : ' (krajina se ještě dopočítává)'}`);
+    console.warn(`Snímek Alp: ${ms.toFixed(1)} ms, blízkých stromů ${trees.count}, padajících listů a vloček ${particles.count}${settled ? '' : ' (krajina se ještě dopočítává)'}`);
     const result = { 'Krajina se s kurzorem nehýbe': parallax[0] === 0 && parallax[1] === 0 };
     if (settled) result['Snímek do 16 ms'] = ms < 16;
     return result;
@@ -712,6 +717,7 @@ window.sceneCheck = (phase) => {
     return { 'Krajina se s kurzorem nehýbe': parallax[0] === 0 && parallax[1] === 0 };
   }
   if (phase === 'akce') {
+    console.warn(`Po akcích: padajících listů a vloček ${particles.count}`);
     return {
       'Krajina je dopočítaná': terrain.materialDone,
       'Na jezeře plují loďky': boats.count > 0,

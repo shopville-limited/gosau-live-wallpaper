@@ -81,7 +81,8 @@ float forestAt(vec2 p) {
 // (0 střed, 1 okraj koruny) a náhodné číslo stromu. Hustota lesa rozhoduje, kolik buněk
 // má strom; nad hranicí lesa jsou stromy nižší (kosodřevina).
 vec4 canopy(vec2 p, float density, float ground) {
-  if (dot(p, p) < uTreeNear * uTreeNear) return vec4(0.0, 1.0, 0.5, 0.0);
+  // Překryv s blízkými stromy (trees.js): koruny začínají od 85 % jejich dosahu.
+  if (dot(p, p) < 0.7225 * uTreeNear * uTreeNear) return vec4(0.0, 1.0, 0.5, 0.0);
   vec2 q = p * 140.0;
   vec2 cell = floor(q);
   vec2 f = q - cell;
@@ -189,7 +190,8 @@ float height(vec2 p, int octaves) {
     // Na okrajích lesa (u stěn a žlabů) jen řídce, ne osamělé šmouhy na skále.
     // U samé vody je štěrková pláž, stromy začínají až za ní.
     float density = smoothstep(0.12, 0.55, forestAt(p)) * smoothstep(0.0035, 0.007, base);
-    if (density > 0.0) h += canopy(p, density, base).x;
+    // V pásmu překryvu koruny postupně vyrůstají (blízkých stromů naopak ubývá).
+    if (density > 0.0) h += canopy(p, density, base).x * smoothstep(0.85, 1.0, length(p) / uTreeNear);
   }
   return h;
 }

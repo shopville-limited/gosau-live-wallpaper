@@ -16,7 +16,7 @@ const FLOATS = 8;               // x, y (země), z, výška, šířka, semínko,
 const VS = /* glsl */ `#version 300 es
 precision highp float;
 in vec4 aBase;      // x, y, z země (km), výška stromu (km)
-in vec4 aShape;     // šířka (km), semínko, druh (0 smrk, 1 modřín, 2 buk, 3 keř, 4 tráva), 1 = ve strmém svahu
+in vec4 aShape;     // šířka (km), semínko, druh (0 smrk, 1 modřín, 2 buk, 3 keř, 4 tráva, 5 kmen/pařez, 6 rákosí), 1 = ve strmém svahu
 uniform float uTime;
 uniform float uGust;
 out vec2 vLocal;    // -1..1 napříč, 0..1 odspodu
@@ -45,7 +45,7 @@ void main() {
   // na návětrné straně se ohnou dřív), tráva a keře se vlní víc a rychleji.
   float wave = 0.5 + 0.5 * sin(base.x * 260.0 + base.z * 90.0 - uTime * 1.6);
   float gust = uGust * (0.35 + 0.65 * wave * wave);
-  float small = step(2.5, aShape.z);
+  float small = step(2.5, aShape.z) * (1.0 - step(4.5, aShape.z) * step(aShape.z, 5.5));
   float rate = mix(0.9 + aShape.y * 0.6, 2.2 + aShape.y * 1.5, small);
   float sway = sin(uTime * rate + aShape.y * 40.0 + base.x * 300.0) * (mix(0.02, 0.08, small) + mix(0.05, 0.18, small) * gust + 0.03 * wave * small) * c.y * c.y;
   vec3 q = base + across * (c.x * wide * 0.5 + sway * wide) + vec3(0.0, c.y * tall, 0.0);
@@ -57,6 +57,10 @@ void main() {
   vBaseUv = b.xy * 0.5 + 0.5;
   vDistance = length(q - vec3(0.0, CAMERA_HEIGHT, 0.0));
   gl_Position = project(q);
+  // Pásmo překryvu se vzdáleným lesem (výšková mapa): blízkých stromů postupně ubývá,
+  // ať není vidět hranice.
+  float fade = smoothstep(${(TREE_NEAR * 0.85).toFixed(3)}, ${TREE_NEAR.toFixed(3)}, length(base.xz));
+  if (aShape.z < 2.5 && fract(aShape.y * 7.31) < fade) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }`;
 
 const FS = /* glsl */ `#version 300 es
@@ -94,7 +98,43 @@ void main() {
   float lit;
   bool broadleaf = vKind > 1.5 && vKind < 2.5;
   float summer = (1.0 - uWinter) * (1.0 - uAutumn) * (1.0 - 0.6 * uSpring);
-  if (vKind > 3.5) {
+  if (vKind > 5.5) {
+    // Rákosí a ostřice na mělčině u břehu: hustý trs dlouhých stébel, některá s doutníkem.
+    if (uWinter > 0.7) { if (y > 0.45) discard; }               // v zimě polámané, nízké
+    float best = 9.0, head = 9.0;
+    vec2 p = vec2(x, y);
+    for (int i = 0; i < 11; i++) {
+      float fi = float(i);
+      float h = hash12(vec2(fi, vSeed * 37.0));
+      vec2 a = vec2((h - 0.5) * 1.4, 0.0);
+      vec2 b = vec2(a.x + (hash12(vec2(fi + 5.0, vSeed)) - 0.5) * 0.5, 0.5 + 0.5 * hash12(vec2(fi + 9.0, vSeed * 3.0)));
+      vec2 pa = p - a, ba = b - a;
+      float t = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+      best = min(best, length(pa - ba * t) - 0.025 * (1.0 - 0.6 * t));
+      if (h < 0.25) head = min(head, length((p - mix(a, b, 0.86)) / vec2(1.0, 3.5)) - 0.035);
+    }
+    if (best > 0.0 && head > 0.0) discard;
+    width = 1.0;
+    vec3 reed = mix(vec3(0.07, 0.10, 0.035), vec3(0.15, 0.12, 0.06), uAutumn * 0.8 + uWinter);
+    color = head < 0.0 ? vec3(0.09, 0.05, 0.025) : reed * (0.6 + 0.6 * y);
+    lit = 0.4 + 0.6 * y;
+  } else if (vKind > 4.5) {
+    // Padlý kmen (ležící válec s mechem navrchu) nebo pařez.
+    bool stump = fract(vSeed * 9.1) > 0.6;
+    vec2 p = vec2(x, y);
+    float d = stump ? max(abs(x) - 0.55, y - 0.85) : max(abs(x) - 0.95, abs(y - 0.4) - 0.38);
+    d += 0.04 * gnoise(p * 12.0 + vSeed * 9.0);
+    if (d > 0.0 || y < 0.0) discard;
+    width = 1.0;
+    float top = stump ? smoothstep(0.65, 0.85, y) : smoothstep(0.55, 0.78, y);
+    vec3 bark = mix(vec3(0.07, 0.055, 0.04), vec3(0.09, 0.085, 0.075), fract(vSeed * 4.3));
+    bark *= 0.75 + 0.4 * (gnoise(vec2(x * (stump ? 18.0 : 3.0), y * (stump ? 2.0 : 25.0)) + vSeed) * 0.5 + 0.5);
+    vec3 moss = vec3(0.04, 0.07, 0.02);
+    color = mix(bark, moss, top * 0.8 * (1.0 - uWinter));
+    color = mix(color, vec3(0.62, 0.64, 0.68), top * uWinter);
+    if (stump && y > 0.8) color = mix(vec3(0.16, 0.12, 0.08), color, 0.4);   // letokruhy
+    lit = stump ? 0.5 + 0.5 * top : 0.35 + 0.65 * smoothstep(0.0, 0.75, y);
+  } else if (vKind > 3.5) {
     // Trs trávy: sedm stébel z jednoho místa do vějíře, na některých kvítek.
     if (uWinter > 0.5) discard;                       // pod sněhem
     float best = 9.0, tipFlower = 9.0;
@@ -270,6 +310,10 @@ void main() {
   vec3 view = normalize(vWorld - vec3(0.0, CAMERA_HEIGHT, 0.0));
   float edge = smoothstep(0.6, 1.0, abs(x) / max(width, 0.05));
   c += color * vec3(0.8, 1.2, 0.5) * sunLight() * pow(max(dot(view, uSun), 0.0), 3.0) * edge * shade * 0.6;
+  // Dál od kamery se barva slévá s lesem výškové mapy (tmavší, modravější), ať na
+  // hranici blízkých stromů není vidět skok.
+  float far = smoothstep(0.45, ${TREE_NEAR.toFixed(3)}, vDistance);
+  c *= mix(vec3(1.0), vec3(0.72, 0.78, 0.9), far);
   // Vzduch mezi stromem a kamerou.
   vec3 transmit = exp(-vec3(0.020, 0.028, 0.042) * vDistance);
   c = c * transmit + skyColor(normalize(vec3(view.x, 0.05, view.z))) * 0.95 * (1.0 - transmit);
@@ -365,6 +409,7 @@ export function createTrees(gl, { map, random }) {
   const vao = gl.createVertexArray();
   const buffer = gl.createBuffer();
   let count = 0;
+  let sources = [];
 
   gl.bindVertexArray(vao);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -445,6 +490,19 @@ export function createTrees(gl, { map, random }) {
         const tall = (0.013 + 0.017 * age * age * (3 - 2 * age)) * (kind === 2 ? 0.9 : 1);
         const wide = tall * (kind === 2 ? 0.6 : 0.36 + random() * 0.08);
         list.push([px, ground - 0.0008, pz, tall, wide, random(), kind, onSlope]);
+        // V lese občas padlý kmen nebo pařez.
+        if (kind === 0 && random() < 0.07) {
+          const a = random() * Math.PI * 2, r = wide * (0.6 + random() * 0.8);
+          const lx = px + Math.cos(a) * r, lz = pz + Math.sin(a) * r;
+          const lg = map.sampleFine(lx, lz);
+          if (lg > 0.0045) {
+            const stump = random() < 0.4;
+            const size = stump ? 0.0007 + random() * 0.0005 : 0.0007 + random() * 0.0004;
+            const length = stump ? size * 0.9 : 0.004 + random() * 0.006;
+            const seed = stump ? 0.07 + random() * 0.03 : random() * 0.06;   // fract(seed*9.1) > 0.6 = pařez
+            list.push([lx, lg - 0.0003, lz, size, length, seed, 5, 0]);
+          }
+        }
         // Podrost u paty stromu: borůvčí, kapradí, mladý smrček (jeden až dva keře).
         const shrubs = random() < 0.7 ? (random() < 0.4 ? 2 : 1) : 0;
         for (let k = 0; k < shrubs; k++) {
@@ -455,6 +513,18 @@ export function createTrees(gl, { map, random }) {
           const size = 0.0009 + random() * 0.0016;
           list.push([sx, sg - 0.0002, sz, size, size * (1.4 + random() * 1.0), random(), 3, 0]);
         }
+      }
+    }
+    // Rákosí a ostřice na mělčinách podél břehu (do 1 km), v pásech, ne všude.
+    for (let z = 0.08; z < 1.0; z += 0.002 * (1 + z * 3)) {
+      const reedStep = 0.002 * (1 + z * 3);
+      for (let x = -halfWidth * z - 0.01; x < halfWidth * z + 0.01; x += reedStep) {
+        const px = x + (random() - 0.5) * reedStep, pz = z + (random() - 0.5) * reedStep;
+        const ground = map.sampleFine(px, pz);
+        if (ground > 0.0012 || ground < -0.0025) continue;      // mělčina a mokrý břeh
+        if (random() > 0.95 * smooth(0.35, 0.6, vnoise(px * 40 + 13, pz * 40 + 2))) continue;
+        const size = (0.0012 + random() * 0.0010) * (1 + z * 0.5);
+        list.push([px, Math.max(0, ground), pz, size, size * (0.7 + random() * 0.5), random(), 6, 0]);
       }
     }
     // Trsy trávy a kvítí na loukách (do 900 m), ne v hustém lese ani ve skalách. Dál od
@@ -483,9 +553,12 @@ export function createTrees(gl, { map, random }) {
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
     count = list.length;
-    const kinds = [0, 0, 0, 0, 0];
+    const kinds = [0, 0, 0, 0, 0, 0, 0];
     for (const t of list) kinds[t[6]]++;
-    console.warn(`Vegetace: smrků ${kinds[0]}, modřínů ${kinds[1]}, buků ${kinds[2]}, keřů ${kinds[3]}, trsů trávy ${kinds[4]}`);
+    console.warn(`Vegetace: smrků ${kinds[0]}, modřínů ${kinds[1]}, buků ${kinds[2]}, keřů ${kinds[3]}, trsů trávy ${kinds[4]}, kmenů a pařezů ${kinds[5]}, trsů rákosí ${kinds[6]}`);
+    // Zdroje padajícího listí a sněhu z větví (blízké stromy, km): x, y koruny, z, druh.
+    sources = list.filter((t) => t[6] <= 2 && Math.hypot(t[0], t[2]) < 0.6)
+      .map((t) => [t[0], t[1] + t[3] * 0.6, t[2], t[6], t[4]]);
   }
 
   const nearest = gl.createSampler();
@@ -495,6 +568,7 @@ export function createTrees(gl, { map, random }) {
   return {
     plant,
     get count() { return count; },
+    get sources() { return sources; },
     /** Kreslí do právě nastaveného framebufferu (HDR obraz scény). */
     draw(o) {
       if (!count) return;

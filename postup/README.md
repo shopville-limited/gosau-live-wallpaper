@@ -410,3 +410,15 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Květen: kvetoucí stromy u jezera, pampelišky na louce](68-kveten-kvetouci-stromy-u-jezera-pampelis.jpg)
 
+## 69. Jemnější, rozvlněný odraz stromů v hladině
+
+*2026-10-01 20:00*
+
+![Jemnější, rozvlněný odraz stromů v hladině](69-jemnejsi-rozvlneny-odraz-stromu-v-hladin.jpg)
+
+## 70. Deštivé podzimní ráno: cáry mraků v lese na svazích
+
+*2026-10-01 20:05*
+
+![Deštivé podzimní ráno: cáry mraků v lese na svazích](70-destive-podzimni-rano-cary-mraku-v-lese.jpg)
+

@@ -48,6 +48,7 @@ uniform float uIce;              // zamrzlé jezero 0..1
 uniform float uSnowfall;         // sněžení 0..1
 uniform float uRain;             // déšť 0..1
 uniform float uHour;             // místní čas v hodinách (0–24)
+uniform float uHumid;            // vlhko: cáry mraků na svazích (po dešti, podzimní rána)
 uniform float uMeteorSeed;       // pořadí padající hvězdy (mění se s každou novou)
 uniform float uMeteorAge;        // s od začátku letu padající hvězdy (0..1,2 = letí)
 uniform float uRealStars;        // 1 = hvězdy z katalogu (stars.js), vymyšlené se nekreslí
@@ -802,6 +803,23 @@ void main() {
     float depthFade = 1.0 - exp(-max(sceneDist - 0.15, 0.0) * 0.9);
     c = mix(c, fogColor, clamp(layer * wisps * fogAmount * depthFade * 0.7, 0.0, 0.8));
   }
+  // Cáry mraků na svazích: po dešti a za podzimních rán visí v lese na svazích
+  // (100–400 m nad jezerem) protáhlé chuchvalce, které pomalu táhnou a mění tvar.
+  if (uHumid > 0.01 && sceneDist > 0.3 && sceneDist < 20.0) {
+    vec3 Pc = vec3(0.0, CAMERA_HEIGHT, 0.0) + rd * sceneDist;
+    // Mrak je objem: pásmo široké ~250 m výšky, tvar podle 3D polohy (v obraze tak
+    // vznikají nadýchané chuchvalce, ne čáry podél vrstevnic).
+    float level = 0.2 + 0.12 * texture(uNoise, Pc.xz * 0.04 + 0.3).r;
+    float band = exp(-pow((Pc.y - level) / 0.13, 2.0));
+    vec2 cq = vec2(Pc.x * 0.22 + Pc.y * 0.35 + uTime * 0.0008, Pc.z * 0.22 - Pc.y * 0.5);
+    float shape = texture(uNoise, cq).r * 0.6 + texture(uNoise, cq * 2.3 + 0.4).r * 0.28 + texture(uNoise, cq * 5.5 + 0.8).r * 0.12;
+    // Ve výřezu obrazu musí být chuchvalec aspoň pár desítek pixelů (u kamery se nekreslí).
+    float cloudy = smoothstep(0.45, 0.7, shape) * band * uHumid * smoothstep(0.3, 0.9, sceneDist);
+    vec3 zenith, horizon;
+    palette(uSun.y, zenith, horizon);
+    vec3 wisp = mix(horizon, zenith, 0.3) * 0.9 + sunLight() * 0.12 + moonLight() * 0.5;
+    c = mix(c, wisp, clamp(cloudy * 1.1, 0.0, 0.85));
+  }
   c = snowScene(c, gl_FragCoord.xy, sceneDist);
   c = rainScene(c, gl_FragCoord.xy, sceneDist);
   // Záře kolem jasných míst (sníh na slunci, měsíc, lucerny, okna) jako v objektivu.
@@ -949,6 +967,7 @@ export function createDisplay(gl) {
       gl.uniform1f(u.uSnowfall, o.snowfall);
       gl.uniform1f(u.uRain, o.rain || 0);
       gl.uniform1f(u.uHour, o.hour ?? 12);
+      gl.uniform1f(u.uHumid, o.humid || 0);
       gl.uniform1f(u.uMeteorSeed, o.meteor ? o.meteor.seed : 0);
       gl.uniform1f(u.uMeteorAge, o.meteor ? o.meteor.age : -1);
       gl.uniform1f(u.uRealStars, o.stars && o.stars.ready ? 1 : 0);

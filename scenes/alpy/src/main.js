@@ -430,6 +430,9 @@ function render() {
     ice: current.season.ice, snowfall: state.snowfall,
     overcast: state.wx.overcast, rain: state.wx.rain * (current.season.ice > 0.7 ? 0 : 1),
     hour: current.date.getHours() + current.date.getMinutes() / 60,
+    // Vlhko pro cáry mraků na svazích: déšť a krátce po něm, zataženo, podzimní ráno.
+    humid: Math.min(1, Math.max(state.wx.rain * 1.2, state.wx.overcast * 0.6,
+      current.season.autumn * Math.max(0, 1 - Math.abs(current.date.getHours() + current.date.getMinutes() / 60 - 8) / 3) * (1 - state.wx.high * 0.3)) * (current.season.ice > 0.7 ? 0.3 : 1)),
     meteor: { seed: state.meteorSeed, age: time - state.meteorAt },
     flash: flashAt(time - state.strikeAt) * (0.5 + 0.5 * (1 - Math.max(0, current.sun[1]) * 2)),
     bolt: state.bolt, boltAlpha: flashAt(time - state.strikeAt) > 0.05 ? Math.min(1, flashAt(time - state.strikeAt) * 1.5) : 0,

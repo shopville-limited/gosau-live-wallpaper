@@ -57,7 +57,10 @@ void main() {
   vec4 b = project(base);
   vBaseUv = b.xy * 0.5 + 0.5;
   vDistance = length(q - vec3(0.0, CAMERA_HEIGHT, 0.0));
-  gl_Position = project(uReflect > 0.5 ? vec3(q.x, -q.y, q.z) : q);
+  // Odraz: zrcadlený podle hladiny a na vlnkách rozvlněný do stran (víc dál od břehu).
+  vec3 m = vec3(q.x, -q.y, q.z);
+  if (uReflect > 0.5) m.x += sin(q.y * 900.0 + uTime * 1.3 + q.x * 400.0) * 0.0006 * c.y;
+  gl_Position = project(uReflect > 0.5 ? m : q);
   // Pásmo překryvu se vzdáleným lesem (výšková mapa): blízkých stromů postupně ubývá,
   // ať není vidět hranice.
   float fade = smoothstep(${(TREE_NEAR * 0.85).toFixed(3)}, ${TREE_NEAR.toFixed(3)}, length(base.xz));
@@ -342,11 +345,13 @@ void main() {
   vec3 transmit = exp(-vec3(0.020, 0.028, 0.042) * vDistance);
   c = c * transmit + skyColor(normalize(vec3(view.x, 0.05, view.z))) * 0.95 * (1.0 - transmit);
   if (uReflect > 0.5) {
-    // Odraz: tmavší, v jemných vlnkách se chvěje; rovnou s úpravou barev obrazovky.
-    c *= 0.72;
+    // Odraz: slabý a neostrý. Hladina odráží jen část světla, vlnky obraz rozbíjejí
+    // do vodorovných proužků a dál od břehu (výš na stromě) odraz slábne.
+    c *= 0.8;
     c = aces(c * uExposure);
     c = pow(c, vec3(uContrast / 2.2));
-    float alpha = 0.8;
+    float streaks = 0.55 + 0.45 * sin(gl_FragCoord.y * 1.9 + uTime * 3.0 + vSeed * 20.0);
+    float alpha = 0.42 * mix(1.0, 0.45, vLocal.y) * streaks;
     outColor = vec4(c * alpha, alpha);
     return;
   }

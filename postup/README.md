@@ -422,3 +422,21 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Deštivé podzimní ráno: cáry mraků v lese na svazích](70-destive-podzimni-rano-cary-mraku-v-lese.jpg)
 
+## 71. Vzdálený les: zelenější, s roztřepeným okrajem proti skále
+
+*2026-10-01 20:20*
+
+![Vzdálený les: zelenější, s roztřepeným okrajem proti skále](71-vzdaleny-les-zelenejsi-s-roztrepenym-okr.jpg)
+
+## 72. Duha po přeháňce a cáry mraků na svazích
+
+*2026-10-01 21:00*
+
+![Duha po přeháňce a cáry mraků na svazích](72-duha-po-prehance-a-cary-mraku-na-svazich.jpg)
+
+## 73. Zima: stopy ve sněhu kolem kluziště, led bez odrazu stromů
+
+*2026-10-01 21:10*
+
+![Zima: stopy ve sněhu kolem kluziště, led bez odrazu stromů](73-zima-stopy-ve-snehu-kolem-kluziste-led-b.jpg)
+

@@ -290,7 +290,8 @@ function weatherTarget(now) {
   // Souvislá vrstva: střední oblačnost, a když je nízká skoro všude, také ona; při srážkách
   // je nebe vždy zatažené.
   const overcast = Math.max(Math.min(1, w.mid * 0.95 + Math.max(0, w.low - 0.75) * 2.4),
-    rain > 0 || falling ? 0.75 : 0, storm * 0.85);
+    // Přeháňky (kódy 80–82): mezi mraky prosvítá slunce, souvislá vrstva je jen řídká.
+    rain > 0 || falling ? (w.code >= 80 && w.code <= 82 ? 0.25 : 0.75) : 0, storm * 0.85);
   return {
     overcast, rain, storm,
     real: 1, low: w.low, mid: w.mid, high: w.high, wind: w.wind, direction: w.direction,
@@ -323,6 +324,8 @@ function flashAt(t) {
   const pulse = (at, width, power) => (t >= at ? power * Math.exp(-(t - at) / width) : 0);
   return Math.min(1, pulse(0, 0.07, 1) + pulse(0.16, 0.06, 0.6) + pulse(0.42, 0.1, 0.45));
 }
+
+const smoothstep01 = (x) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 
 function snowWanted(now) {
   if (state.time < state.snowUntil) return 1;
@@ -436,6 +439,8 @@ function render() {
     overcast: state.wx.overcast, rain: state.wx.rain * (current.season.ice > 0.7 ? 0 : 1),
     hour: current.date.getHours() + current.date.getMinutes() / 60,
     // Vlhko pro cáry mraků na svazích: déšť a krátce po něm, zataženo, podzimní ráno.
+    // Duha: dokud ještě trochu prší nebo chvíli po dešti, když slunce prosvítá (není zataženo).
+    rainbow: Math.min(1, state.wx.rain * 3) * (1 - smoothstep01((state.wx.overcast - 0.2) / 0.5)) * (state.wx.real > 0.5 ? 1 : 0),
     humid: Math.min(1, Math.max(state.wx.rain * 1.2, state.wx.overcast * 0.6,
       current.season.autumn * Math.max(0, 1 - Math.abs(current.date.getHours() + current.date.getMinutes() / 60 - 8) / 3) * (1 - state.wx.high * 0.3)) * (current.season.ice > 0.7 ? 0.3 : 1)),
     meteor: { seed: state.meteorSeed, age: time - state.meteorAt },

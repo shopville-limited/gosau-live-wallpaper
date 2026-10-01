@@ -49,6 +49,7 @@ uniform float uSnowfall;         // sněžení 0..1
 uniform float uRain;             // déšť 0..1
 uniform float uHour;             // místní čas v hodinách (0–24)
 uniform float uHumid;            // vlhko: cáry mraků na svazích (po dešti, podzimní rána)
+uniform float uRainbow;          // duha 0..1 (dešťová clona proti slunci)
 uniform float uMeteorSeed;       // pořadí padající hvězdy (mění se s každou novou)
 uniform float uMeteorAge;        // s od začátku letu padající hvězdy (0..1,2 = letí)
 uniform float uRealStars;        // 1 = hvězdy z katalogu (stars.js), vymyšlené se nekreslí
@@ -220,6 +221,29 @@ vec3 meteor(vec2 uv) {
   float fade = smoothstep(0.0, 0.15, uMeteorAge) * (1.0 - smoothstep(0.7, 1.2, uMeteorAge));
   float glow = exp(-side * side * 3.0e6) * onTrail * smoothstep(head - tail, head, along);
   return vec3(0.9, 0.95, 1.0) * glow * fade * night * 1.6;
+}
+
+// Duha: oblouk 42° (fialová uvnitř, červená venku) kolem protisluneční strany, slabší
+// vedlejší oblouk 51° s obrácenými barvami a tmavší pás mezi nimi. Jen po dešti při
+// slunci nad obzorem a výš než 42° nad obzorem nevystoupí (fyzika lomu v kapkách).
+// Barva duhy v místě oblouku t (0 = vnitřní fialový okraj, 1 = vnější červený): plynulé
+// překrývající se pásy jako ve skutečném spektru, okraje měkké (kotouč slunce je 0,5°).
+vec3 bowColor(float t) {
+  vec3 c = vec3(exp(-pow((t - 0.85) / 0.2, 2.0)),
+                exp(-pow((t - 0.5) / 0.22, 2.0)) * 0.85,
+                exp(-pow((t - 0.15) / 0.2, 2.0)) * 0.9);
+  return c + vec3(0.12) * exp(-pow((t - 0.5) / 0.5, 2.0));   // trocha bílé (překryv barev)
+}
+
+vec3 rainbow(vec3 rd) {
+  if (uRainbow <= 0.0 || uSun.y < 0.0) return vec3(0.0);
+  float ang = degrees(acos(clamp(dot(rd, -uSun), -1.0, 1.0)));
+  // Primární oblouk 40,5–42,5°, vedlejší 50–53,5° (obrácené barvy, slabší); uvnitř
+  // primárního je nebe o něco světlejší, mezi oblouky tmavší (Alexandrův pás).
+  vec3 c = bowColor((ang - 40.5) / 2.0) * smoothstep(39.8, 40.6, ang) * (1.0 - smoothstep(42.4, 43.2, ang));
+  c += bowColor(1.0 - (ang - 50.0) / 3.5) * 0.3 * smoothstep(49.3, 50.2, ang) * (1.0 - smoothstep(53.3, 54.2, ang));
+  c += vec3(0.06) * (1.0 - smoothstep(36.0, 40.5, ang)) * smoothstep(25.0, 38.0, ang);
+  return c * sunLight() * 0.035 * uRainbow;
 }
 
 vec3 skyWithClouds(vec3 rd, vec2 uv) {
@@ -613,6 +637,15 @@ vec3 waterColor(vec3 rd, float dist) {
     snowIce = mix(snowIce, vec3(0.42, 0.47, 0.52), smoothstep(0.62, 0.8, 1.0 - big) * 0.5);
     float path = (1.0 - smoothstep(0.004, 0.009, abs(P.x - RINK.x - 0.012 * sin(P.z * 60.0)))) * step(P.z, RINK.y - RINK.w * 0.8) * solid;
     snowIce = mix(snowIce, vec3(0.55, 0.57, 0.6), path * 0.6);
+    // Stopy ve sněhu: šlápoty po pěšince a v kruhu kolem kluziště (bruslaři chodí kolem),
+    // každá stopa je mělký modravý důlek ve stínu.
+    vec2 fp = P.xz * 1000.0 / vec2(0.35, 0.7);                 // stopy po ~35 a 70 cm
+    vec2 fid = floor(fp);
+    vec2 ff = fract(fp) - 0.5 - (hash22(fid) - 0.5) * 0.3;
+    float print = 1.0 - smoothstep(0.18, 0.32, length(ff / vec2(0.7, 1.0)));
+    float around = smoothstep(0.95, 1.05, rinkR) * (1.0 - smoothstep(1.35, 1.6, rinkR));
+    float walked = max(path, around * step(0.35, hash12(fid + 7.0))) * solid * (1.0 - smoothstep(0.15, 0.4, dist));
+    snowIce = mix(snowIce, vec3(0.42, 0.48, 0.58), print * walked * 0.7);
     snowIce *= iceLight;
     vec3 ice = mix(blackIce, snowIce, snowy);
     c = mix(c, ice, frozen);
@@ -725,6 +758,25 @@ vec3 lightningBolt(vec2 fragCoord, float sceneDist) {
   return vec3(0.85, 0.88, 1.0) * (core * 6.0 + glow * 0.5) * uBoltAlpha;
 }
 
+// Cáry mraků na svazích: po dešti a za podzimních rán visí v lese na svazích
+// (100–400 m nad jezerem) protáhlé chuchvalce, které pomalu táhnou a mění tvar.
+// Vrací barvu a krytí pro bod svahu ve vzdálenosti dist podél směru dir.
+vec4 slopeWisp(vec3 dir, float dist) {
+  if (dist < 0.3 || dist > 20.0) return vec4(0.0);
+  vec3 Pc = vec3(0.0, CAMERA_HEIGHT, 0.0) + dir * dist;
+  // Mrak je objem: pásmo široké ~250 m výšky, tvar podle 3D polohy (v obraze tak
+  // vznikají nadýchané chuchvalce, ne čáry podél vrstevnic).
+  float level = 0.2 + 0.12 * texture(uNoise, Pc.xz * 0.04 + 0.3).r;
+  float band = exp(-pow((Pc.y - level) / 0.13, 2.0));
+  vec2 cq = vec2(Pc.x * 0.22 + Pc.y * 0.35 + uTime * 0.0008, Pc.z * 0.22 - Pc.y * 0.5);
+  float shape = texture(uNoise, cq).r * 0.6 + texture(uNoise, cq * 2.3 + 0.4).r * 0.28 + texture(uNoise, cq * 5.5 + 0.8).r * 0.12;
+  float cloudy = smoothstep(0.45, 0.7, shape) * band * uHumid * smoothstep(0.3, 0.9, dist);
+  vec3 zenith, horizon;
+  palette(uSun.y, zenith, horizon);
+  vec3 wisp = mix(horizon, zenith, 0.3) * 0.9 + sunLight() * 0.12 + moonLight() * 0.5;
+  return vec4(wisp, clamp(cloudy * 1.1, 0.0, 0.85));
+}
+
 vec3 aces(vec3 x) {
   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
 }
@@ -803,25 +855,28 @@ void main() {
     float depthFade = 1.0 - exp(-max(sceneDist - 0.15, 0.0) * 0.9);
     c = mix(c, fogColor, clamp(layer * wisps * fogAmount * depthFade * 0.7, 0.0, 0.8));
   }
-  // Cáry mraků na svazích: po dešti a za podzimních rán visí v lese na svazích
-  // (100–400 m nad jezerem) protáhlé chuchvalce, které pomalu táhnou a mění tvar.
-  if (uHumid > 0.01 && sceneDist > 0.3 && sceneDist < 20.0) {
-    vec3 Pc = vec3(0.0, CAMERA_HEIGHT, 0.0) + rd * sceneDist;
-    // Mrak je objem: pásmo široké ~250 m výšky, tvar podle 3D polohy (v obraze tak
-    // vznikají nadýchané chuchvalce, ne čáry podél vrstevnic).
-    float level = 0.2 + 0.12 * texture(uNoise, Pc.xz * 0.04 + 0.3).r;
-    float band = exp(-pow((Pc.y - level) / 0.13, 2.0));
-    vec2 cq = vec2(Pc.x * 0.22 + Pc.y * 0.35 + uTime * 0.0008, Pc.z * 0.22 - Pc.y * 0.5);
-    float shape = texture(uNoise, cq).r * 0.6 + texture(uNoise, cq * 2.3 + 0.4).r * 0.28 + texture(uNoise, cq * 5.5 + 0.8).r * 0.12;
-    // Ve výřezu obrazu musí být chuchvalec aspoň pár desítek pixelů (u kamery se nekreslí).
-    float cloudy = smoothstep(0.45, 0.7, shape) * band * uHumid * smoothstep(0.3, 0.9, sceneDist);
-    vec3 zenith, horizon;
-    palette(uSun.y, zenith, horizon);
-    vec3 wisp = mix(horizon, zenith, 0.3) * 0.9 + sunLight() * 0.12 + moonLight() * 0.5;
-    c = mix(c, wisp, clamp(cloudy * 1.1, 0.0, 0.85));
+  // Cáry mraků na svazích (viz slopeWisp) a jejich odraz v hladině: zrcadlený paprsek
+  // najde na obrazovce bod svahu, který se v daném místě vody zrcadlí.
+  if (uHumid > 0.01) {
+    if (scene.a < 0.5 && rd.y < 0.0) {
+      vec3 rm = vec3(rd.x, -rd.y, rd.z);
+      vec2 muv = screenOf(rm);
+      float ma = muv.y <= 1.0 ? depthAt(muv) : 1000.0;
+      if (ma > 0.0 && ma < 900.0) {
+        vec4 w = slopeWisp(rm, terrainDepth(ma).x);
+        c = mix(c, w.rgb * 0.8, w.a * 0.6 * (1.0 - uIce));
+      }
+    } else {
+      vec4 w = slopeWisp(rd, sceneDist);
+      c = mix(c, w.rgb, w.a);
+    }
   }
   c = snowScene(c, gl_FragCoord.xy, sceneDist);
   c = rainScene(c, gl_FragCoord.xy, sceneDist);
+  // Duha v dešťové cloně: přes hory a oblohu (ne přes blízký břeh), na vodě slabě zrcadlená.
+  // Síla podle toho, kolik deště je mezi okem a horou (blízký svah jen slabě).
+  if (rd.y >= 0.0 || scene.a > 0.5) c += rainbow(rd) * smoothstep(0.6, 8.0, sceneDist);
+  else c += rainbow(vec3(rd.x, -rd.y, rd.z)) * 0.35 * (1.0 - uIce);
   // Záře kolem jasných míst (sníh na slunci, měsíc, lucerny, okna) jako v objektivu.
   vec3 glow = textureLod(uScene, uv, 3.0).rgb * 0.5 + textureLod(uScene, uv, 5.0).rgb * 0.3 + textureLod(uScene, uv, 7.0).rgb * 0.2;
   float brightness = dot(glow, vec3(0.3, 0.5, 0.2)) * uExposure;
@@ -970,6 +1025,7 @@ export async function createDisplay(gl) {
       gl.uniform1f(u.uRain, o.rain || 0);
       gl.uniform1f(u.uHour, o.hour ?? 12);
       gl.uniform1f(u.uHumid, o.humid || 0);
+      gl.uniform1f(u.uRainbow, o.rainbow || 0);
       gl.uniform1f(u.uMeteorSeed, o.meteor ? o.meteor.seed : 0);
       gl.uniform1f(u.uMeteorAge, o.meteor ? o.meteor.age : -1);
       gl.uniform1f(u.uRealStars, o.stars && o.stars.ready ? 1 : 0);

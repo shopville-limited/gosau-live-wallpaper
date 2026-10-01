@@ -644,7 +644,8 @@ export async function createTrees(gl, { map, random }) {
     get planting() { return planting !== null; },
     /** Odraz stromů a rákosí v jezeře, po posledním průchodu (rovnou do obrazovky). */
     drawReflection(o) {
-      if (!count || !o.scene) return;
+      // Zamrzlé zasněžené jezero stromy nezrcadlí.
+      if (!count || !o.scene || o.season.ice > 0.5) return;
       const u = program.u;
       gl.useProgram(program.program);
       gl.activeTexture(gl.TEXTURE0);

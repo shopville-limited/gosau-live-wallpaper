@@ -1,4 +1,4 @@
-﻿# Postup práce na tapetě
+# Postup práce na tapetě
 
 Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\snimek-postupu.cmd "popis"`.
 
@@ -445,4 +445,10 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 *2026-10-02 16:00*
 
 ![Krkonoše: první verze, výhled ze Studniční hory na Sněžku (DMR 5G)](74-krkonose-prvni-verze-vyhled-ze-studnicni.jpg)
+
+## 75. Krkonoše: kamera na hraně Úpské jámy, stavby na Sněžce, kleč, tmavá skála místo šedých skvrn
+
+*2026-10-02 16:05*
+
+![Krkonoše: kamera na hraně Úpské jámy, stavby na Sněžce, kleč, tmavá skála místo šedých skvrn](75-krkonose-kamera-na-hrane-upske-jamy-stav.jpg)
 

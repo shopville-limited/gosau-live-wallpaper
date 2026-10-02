@@ -47,7 +47,7 @@ namespace MojeTapeta
                 string.Join(", ", scene.Actions.Select(a => a.Id + "=" + a.Title)));
 
             string data = Path.Combine(Path.GetTempPath(), "MojeTapeta-test");
-            var options = new CoreWebView2EnvironmentOptions("--disable-features=CalculateNativeWinOcclusion " +
+            var options = new CoreWebView2EnvironmentOptions("--gpu-program-cache-size-kb=131072 --gpu-disk-cache-size-kb=262144 --disable-features=CalculateNativeWinOcclusion " +
                 "--disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding");
             var environment = await CoreWebView2Environment.CreateAsync(null, data, options);
             report.AppendLine("WebView2 Runtime: " + environment.BrowserVersionString);

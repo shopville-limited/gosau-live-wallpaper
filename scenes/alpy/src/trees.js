@@ -492,6 +492,7 @@ export async function createTrees(gl, { map, random }) {
   // Rozmisťování je rozdělené do dávek (generátor, dávka po každé řadě), ať nezablokuje
   // kreslení: s podrostem a trávou trvá celé i desítky sekund.
   let planting = null;
+  let work = 0, pumps = 0;
 
   /** Rozmístí stromy v zorném poli (jednou, pro daný výhled), postupně v dávkách. */
   function plant(world) {
@@ -501,10 +502,12 @@ export async function createTrees(gl, { map, random }) {
   /** Pokračuje v rozmisťování nejvýš budget ms (volá se každý snímek). */
   function pump(budget = 6) {
     if (!planting) return;
-    const end = performance.now() + budget;
+    const t0 = performance.now(), end = t0 + budget;
+    pumps++;
     while (performance.now() < end) {
-      if (planting.next().done) { planting = null; return; }
+      if (planting.next().done) { planting = null; break; }
     }
+    work += performance.now() - t0;
   }
 
   function* plantSteps(world) {
@@ -632,7 +635,7 @@ export async function createTrees(gl, { map, random }) {
     count = list.length;
     const kinds = [0, 0, 0, 0, 0, 0, 0];
     for (const t of list) kinds[t[6]]++;
-    console.warn(`Vegetace rozmístěna za ${((performance.now() - started) / 1000).toFixed(1)} s (v dávkách, kreslení běží dál)`);
+    console.warn(`Vegetace rozmístěna za ${((performance.now() - started) / 1000).toFixed(1)} s (výpočet ${(work / 1000).toFixed(1)} s v ${pumps} dávkách)`);
     console.warn(`Vegetace: smrků ${kinds[0]}, modřínů ${kinds[1]}, buků ${kinds[2]}, keřů ${kinds[3]}, trsů trávy ${kinds[4]}, kmenů a pařezů ${kinds[5]}, trsů rákosí ${kinds[6]}`);
     // Zdroje padajícího listí a sněhu z větví (blízké stromy, km): x, y koruny, z, druh.
     // Louky pro svatojánské mušky: trsy trávy blízko kamery.

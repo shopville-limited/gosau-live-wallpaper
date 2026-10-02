@@ -488,8 +488,12 @@ function render() {
   if (state.frames === 1) document.documentElement.dataset.ready = 'true';
 }
 
+// Rozmisťování vegetace běží i mimo snímky (při zpomalené nebo zakryté tapetě by jinak
+// trvalo minuty): každých 30 ms kousek práce.
+setInterval(() => trees.pump(8), 30);
+
 function frame(dt) {
-  trees.pump(6);
+  trees.pump(4);
   current = sky(currentDate());
   state.accumulator += dt;
   let steps = 0;

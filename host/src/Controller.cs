@@ -102,7 +102,10 @@ namespace MojeTapeta
             try
             {
                 var options = new CoreWebView2EnvironmentOptions(
-                    "--disable-features=CalculateNativeWinOcclusion --disable-background-timer-throttling " +
+                    // Větší mezipaměť přeložených shaderů: scéna má velké programy a s výchozí
+                    // velikostí se při každém spuštění překládaly znovu (desítky sekund).
+                    "--gpu-program-cache-size-kb=131072 --gpu-disk-cache-size-kb=262144 " +
+                    "--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling --disable-background-timer-throttling " +
                     "--disable-backgrounding-occluded-windows --disable-renderer-backgrounding");
                 string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MojeTapeta", "WebView2");
                 environment = await CoreWebView2Environment.CreateAsync(null, data, options);

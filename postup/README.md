@@ -452,3 +452,15 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Krkonoše: kamera na hraně Úpské jámy, stavby na Sněžce, kleč, tmavá skála místo šedých skvrn](75-krkonose-kamera-na-hrane-upske-jamy-stav.jpg)
 
+## 76. Krkonoše: popředí na plošině nad Úpskou jámou – tráva s kvítím, žulové balvany, kleč
+
+*2026-10-02 16:43*
+
+![Krkonoše: popředí na plošině nad Úpskou jámou – tráva s kvítím, žulové balvany, kleč](76-krkonose-popredi-na-plosine-nad-upskou-j.jpg)
+
+## 77. Krkonoše v zimě: zasněžené balvany a kleč, vyfoukané hřbety
+
+*2026-10-02 16:43*
+
+![Krkonoše v zimě: zasněžené balvany a kleč, vyfoukané hřbety](77-krkonose-v-zime-zasnezene-balvany-a-klec.jpg)
+

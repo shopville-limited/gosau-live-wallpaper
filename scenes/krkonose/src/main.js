@@ -467,13 +467,7 @@ function render() {
       shadow: terrain.shadowState(state.time).to, depth: terrain.full.albedo, scene: display.sceneTexture,
     });
   }
-  boulders.drawReflection({
-    world, pixels: state.pixels, time, sun: current.sun, moon: current.moon, moonPhase: current.moonPhase,
-    overcast: state.wx.overcast, flash: 0, exposure: config.jas * exposureFor(s), contrast: config.kontrast,
-    season: current.season, ice: current.season.ice, shadow: terrain.shadowState(state.time).to,
-    scene: display.sceneTexture,
-    rain: state.wx.rain * (current.season.ice > 0.7 ? 0 : 1),
-  });
+  // Odrazy balvanů ne: v Krkonoších není hladina.
   boats.draw({
     world, pixels: state.pixels, exposure: config.jas * exposureFor(s), contrast: config.kontrast,
     sun: current.sun, moon: current.moon, moonPhase: current.moonPhase, time,

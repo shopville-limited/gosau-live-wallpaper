@@ -14,32 +14,32 @@
   "lakeLevel": 0,
   "base": 0,
   "scale": 0.1,
-  "cameraGround": 1498.4,
+  "cameraGround": 1506.9,
   "camera": {
-    "lat": 50.72867,
-    "lon": 15.71217,
+    "lat": 50.72855,
+    "lon": 15.71171,
     "azimuth": 67.37
   },
   "places": {
     "snezka": [
       0,
-      2.117
+      2.152
     ],
     "lucniBouda": [
-      -1.0829,
-      -0.7983
+      -1.0827,
+      -0.7633
     ],
     "obriBouda": [
-      1.5759,
-      1.1317
+      1.576,
+      1.1669
     ],
     "peceSnezka": [
-      4.2449,
-      -0.4085
+      4.2451,
+      -0.3731
     ],
     "karpacz": [
-      -3.6394,
-      4.9397
+      -3.6396,
+      4.9744
     ]
   },
   "source": "ČÚZK DMR 5G (CC BY 4.0, ags.cuzk.cz); polská strana a dálka Mapzen Terrain Tiles (AWS Open Data)"

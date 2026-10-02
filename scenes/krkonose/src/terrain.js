@@ -201,8 +201,11 @@ float height(vec2 p, int octaves) {
     // Vysoko (nad ~2200 m n. m.) je holý vápenec: výrazná žebra, hřebeny a žlaby, které
     // výšková data (25 m) vyhladí. Zde nevadí stíny, svahy jsou daleko.
     // Krkonoše: oblé hřbety, žádné vápencové pilíře; jen balvanitá sutě a nerovnosti po metrech.
-    rocky = smoothstep(1.35, 1.55, h);
-    h += rocky * 0.003 * (crags - 0.5) + 0.0008 * gnoise(p * 45.0 + uSeed);
+    // Balvanité jen temeno Sněžky (uHut = vrchol). U kamery jemný šum slabě: tráva, kleč
+    // a balvany se sází podle hladké mapy DMR 5G a metrové hrboly by je zakopaly.
+    rocky = smoothstep(1.35, 1.55, h) * (1.0 - smoothstep(0.25, 0.5, distance(p, uHut)));
+    float nearCam = smoothstep(0.06, 0.4, length(p));
+    h += rocky * 0.003 * (crags - 0.5) + mix(0.00012, 0.0008, nearCam) * gnoise(p * 45.0 + uSeed);
     // Na okrajích lesa (u stěn a žlabů) jen řídce, ne osamělé šmouhy na skále.
     // U samé vody je štěrková pláž, stromy začínají až za ní.
     float density = forestDensity(p) * smoothstep(0.0035, 0.007, base);

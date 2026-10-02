@@ -1,6 +1,6 @@
-// Bludné balvany v popředí jako skutečné 3D tvary (vzdálenostní funkce), ne výšková mapa:
-// kompaktní vápencové bloky obroušené ledovcem, se zaoblenými hranami, lomovými plochami
-// a hrbolatým povrchem, kolem nich menší kameny. Výšková mapa by měla v této vzdálenosti
+// Žulové balvany v popředí na okraji Úpské jámy jako skutečné 3D tvary (vzdálenostní funkce),
+// ne výšková mapa: mrazem rozpukané bloky krkonošské žuly se zaoblenými hranami, lomovými
+// plochami a hrbolatým povrchem, kolem nich menší kameny. Výšková mapa by měla v této vzdálenosti
 // schody na obrysu a neuměla by strmé ani převislé boky.
 //
 // Kreslí se ve dvou krocích: balvan do obrazu scény (projde pak deštěm, sněžením, září
@@ -11,8 +11,16 @@ import { createProgramAsync } from '../../shared/gl.js';
 import { NOISE } from '../../shared/glsl.js';
 import { CAMERA, ATMOSPHERE } from './world.js';
 
-// Velké balvany: x, z (km), šířka, výška nad vodou, hloubka (m), natočení (rad).
-const BIG = [];   // Ve výhledu ze Studniční hory nejsou balvany ve vodě.
+// Velké balvany: x, z (km), šířka, výška nad zemí, hloubka (m), natočení (rad).
+// Leží na plošině před hranou jámy (hrana je asi 40 m před kamerou), po stranách výhledu,
+// ať nezakryjí Sněžku.
+const BIG = [
+  [-0.0098, 0.023, 2.4, 1.1, 1.9, 0.4],
+  [-0.0128, 0.029, 1.5, 0.8, 1.3, -0.6],
+  [0.0108, 0.026, 2.0, 0.9, 1.6, 1.0],
+  [0.0138, 0.035, 1.3, 0.7, 1.1, 0.2],
+  [-0.0052, 0.041, 1.0, 0.5, 0.9, 0.9],
+];
 const FLOATS = 12;
 
 // Náhodná čísla se semínkem: balvany mají při každém startu stejný tvar.
@@ -48,19 +56,22 @@ precision highp float;
 precision highp int;
 in vec4 aPlace;     // x, z (km), natočení, semínko
 in vec4 aSize;      // šířka, výška, hloubka (m), zrcadlo (1 = odraz)
+in float aGround;   // výška země pod balvanem (km n. m.)
 uniform vec2 uPixels;
 out vec4 vPlace;
 out vec4 vSize;
+out float vGround;
 ${NOISE}
 ${CAMERA}
 const vec2 CORNERS[6] = vec2[6](vec2(-1, -1), vec2(1, -1), vec2(1, 1), vec2(-1, -1), vec2(1, 1), vec2(-1, 1));
 void main() {
   vPlace = aPlace;
   vSize = aSize;
+  vGround = aGround;
   vec2 c = CORNERS[gl_VertexID];
   float radius = length(aSize.xyz * vec3(0.5, 1.0, 0.5)) * 1.15 / 1000.0;   // km
   float mirror = aSize.w > 0.5 ? -1.0 : 1.0;
-  vec3 center = vec3(aPlace.x, mirror * aSize.y * 0.45 / 1000.0, aPlace.y) - vec3(0.0, CAMERA_HEIGHT, 0.0);
+  vec3 center = vec3(aPlace.x, aGround + mirror * aSize.y * 0.45 / 1000.0, aPlace.y) - vec3(0.0, CAMERA_HEIGHT, 0.0);
   vec2 uv = screenOf(center);
   // Poloměr koule na obrazovce (s rezervou) v jednotkách výšky obrazu.
   float r = radius / max(center.z - radius, 1e-4) / uSpan * 1.2;
@@ -73,6 +84,7 @@ precision highp float;
 precision highp int;
 in vec4 vPlace;
 in vec4 vSize;
+in float vGround;
 uniform vec2 uPixels;
 uniform float uExposure;
 uniform float uContrast;
@@ -154,7 +166,7 @@ void main() {
   // Do soustavy balvanu (metry).
   float yaw = vPlace.z;
   vec3 fwd = vec3(cos(yaw), 0.0, sin(yaw)), side = vec3(-sin(yaw), 0.0, cos(yaw));
-  vec3 rel = (cam - vec3(vPlace.x, 0.0, vPlace.y)) * 1000.0;
+  vec3 rel = (cam - vec3(vPlace.x, vGround, vPlace.y)) * 1000.0;
   vec3 ro = vec3(dot(rel, fwd), rel.y, dot(rel, side));
   vec3 dir = vec3(dot(rd, fwd), rd.y, dot(rd, side));
 
@@ -195,7 +207,7 @@ void main() {
   surfaceInfo(p, max(pix * bestT * 0.7, 0.01), n, aoShape);
   vec3 wn = fwd * n.x + vec3(0.0, n.y, 0.0) + side * n.z;   // normála ve světě
 
-  // Vápenec: textura skutečné horniny, lišejníky, u vody mokrý tmavý pruh a řasy.
+  // Žula: textura skutečné horniny, lišejníky, pata v trávě.
   vec3 tw = pow(abs(n), vec3(4.0));
   tw /= tw.x + tw.y + tw.z;
   vec3 wp = p + gSeed * 50.0;
@@ -203,14 +215,17 @@ void main() {
   tex = pow(tex, vec3(2.2)) / uRockMean;
   // Kontrast kresby textury zmírněný (tmavé důlky by vypadaly jako krátery).
   tex = mix(vec3(1.0), tex, 0.6);
-  vec3 tone = mix(vec3(0.19, 0.18, 0.165), vec3(0.17, 0.165, 0.15), noise3(wp * 0.25) * 0.5 + 0.5);
+  // Žula: šedá s narůžovělým nádechem živců, zvětralá do tmavších skvrn.
+  vec3 tone = mix(vec3(0.12, 0.112, 0.105), vec3(0.09, 0.087, 0.083), noise3(wp * 0.25) * 0.5 + 0.5);
   vec3 stone = tone * tex * (0.85 + 0.25 * noise3(wp * 0.4));
+  // Lišejníky: žlutozelené mapy (Rhizocarpon) a šedé až černé skvrny, víc na horních plochách.
   float lichen = smoothstep(0.55, 0.8, noise3(wp * 1.3 + 7.0) * 0.5 + 0.5);
-  stone = mix(stone, vec3(0.20, 0.19, 0.12), lichen * 0.5);
-  // U vody: pás mokrého tmavého kamene (hladina kolísá, vlny šplouchají), nejníž řasy.
-  float wet = 1.0 - smoothstep(0.25, 0.7 + 0.25 * noise3(wp * 1.3), p.y);
-  stone = mix(stone, stone * vec3(0.4, 0.42, 0.38), wet);
-  stone = mix(stone, vec3(0.035, 0.05, 0.03), (1.0 - smoothstep(0.0, 0.2, p.y)) * 0.75);
+  stone = mix(stone, vec3(0.17, 0.18, 0.07), lichen * 0.45 * smoothstep(-0.2, 0.6, n.y));
+  float dark = smoothstep(0.6, 0.85, noise3(wp * 2.1 + 11.0) * 0.5 + 0.5);
+  stone = mix(stone, vec3(0.05, 0.05, 0.045), dark * 0.4);
+  // Pata kamene zarostlá trávou a vlhčí.
+  float wet = 0.0;
+  stone = mix(stone, stone * vec3(0.55, 0.6, 0.45), 1.0 - smoothstep(0.0, 0.25, p.y));
   // Mech a jehličí v úžlabinách nahoře, v zimě sníh na vodorovných plochách.
   float moss = smoothstep(0.55, 0.8, n.y) * smoothstep(0.6, 0.85, noise3(wp * 0.8 + 3.0) * 0.5 + 0.5);
   stone = mix(stone, vec3(0.05, 0.07, 0.03), moss * 0.5 * (1.0 - uWinter));
@@ -221,7 +236,7 @@ void main() {
   wet = max(wet, uRainWet * 0.6);
 
   // Světlo: slunce se stínem hor a vlastním stínem, obloha podle natočení, měsíc.
-  float shade = texture(uShadow, screenOf(vec3(vPlace.x, 0.0, vPlace.y) - vec3(0.0, CAMERA_HEIGHT, 0.0))).r;
+  float shade = texture(uShadow, screenOf(vec3(vPlace.x, vGround, vPlace.y) - vec3(0.0, CAMERA_HEIGHT, 0.0))).r;
   if (uSun.y < -0.03) shade = 1.0;
   vec3 sunL = vec3(dot(uSun, fwd), uSun.y, dot(uSun, side));
   float self = 1.0;
@@ -242,12 +257,12 @@ void main() {
   sky = mix(sky, vec3(dot(sky, vec3(0.3, 0.5, 0.2))), 0.55);
   // V zimě prosvětluje stín světlo odražené od sněhu a ledu kolem.
   sky += vec3(dot(sunLight(), vec3(0.3, 0.5, 0.2))) * 0.12 * uWinter * max(uSun.y, 0.0) * (1.0 - 0.5 * wn.y);
-  vec3 bounce = mix(horizon, zenith, 0.4) * 0.3 * max(-wn.y, 0.0);   // světlo od vody zespodu
+  vec3 bounce = vec3(0.05, 0.07, 0.03) * max(-wn.y, 0.0);   // světlo od trávy zespodu
   // Měkký přechod do stínu: u rozhraní by jinak zářil tenký proužek.
   float diffuse = max(dot(n, sunL), 0.0) * smoothstep(0.0, 0.2, dot(n, sunL));
   vec3 c = stone * (sunLight() * diffuse * shade * self + (sky * 0.95 + bounce) * ao
                     + moonLight() * max(dot(wn, uMoon), 0.0) * 1.5);
-  // Mokrý kámen u vody se leskne.
+  // Mokrý kámen (déšť) se leskne.
   vec3 refl = reflect(dir, n);
   c += sunLight() * shade * self * wet * 0.35 * pow(max(dot(refl, sunL), 0.0), 40.0);
   // Vzduch mezi kamenem a okem (stejně jako krajina).
@@ -269,24 +284,31 @@ void main() {
 export async function createBoulders(gl, { map }) {
   const program = await createProgramAsync(gl, VS, FS, 'boulders');
   const list = boulderList();
+  // Země pod balvanem: nejnižší bod pod jeho půdorysem (na svahu se nesmí vznášet).
+  const ground = list.map(([x, z, w]) => {
+    const r = (w * 0.5) / 1000;
+    let low = Infinity;
+    for (const [dx, dz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) low = Math.min(low, map.sampleFine(x + dx, z + dz));
+    return low - 0.0002;
+  });
   const vao = gl.createVertexArray();
   const buffer = gl.createBuffer();
   const build = (mirror) => {
-    const data = new Float32Array(list.length * 8);
-    list.forEach(([x, z, w, h, d, yaw, seed], i) => data.set([x, z, yaw, seed, w, h, d, mirror], i * 8));
+    const data = new Float32Array(list.length * 9);
+    list.forEach(([x, z, w, h, d, yaw, seed], i) => data.set([x, z, yaw, seed, w, h, d, mirror, ground[i]], i * 9));
     return data;
   };
-  const both = new Float32Array(list.length * 16);
+  const both = new Float32Array(list.length * 18);
   both.set(build(0), 0);
-  both.set(build(1), list.length * 8);
+  both.set(build(1), list.length * 9);
   gl.bindVertexArray(vao);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, both, gl.STATIC_DRAW);
-  for (const [name, offset] of [['aPlace', 0], ['aSize', 4]]) {
+  for (const [name, offset, size] of [['aPlace', 0, 4], ['aSize', 4, 4], ['aGround', 8, 1]]) {
     const location = program.attributes[name];
     if (location === undefined || location < 0) continue;
     gl.enableVertexAttribArray(location);
-    gl.vertexAttribPointer(location, 4, gl.FLOAT, false, 32, offset * 4);
+    gl.vertexAttribPointer(location, size, gl.FLOAT, false, 36, offset * 4);
     gl.vertexAttribDivisor(location, 1);
   }
   gl.bindVertexArray(null);
@@ -350,12 +372,13 @@ export async function createBoulders(gl, { map }) {
 
   function drawRange(o, mirror) {
     // Instance pro odraz jsou za instancemi balvanů: posun začátku atributů.
-    const location = [program.attributes.aPlace, program.attributes.aSize];
+    const location = [program.attributes.aPlace, program.attributes.aSize, program.attributes.aGround];
     gl.bindVertexArray(vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    const base = mirror ? list.length * 32 : 0;
-    if (location[0] >= 0) gl.vertexAttribPointer(location[0], 4, gl.FLOAT, false, 32, base);
-    if (location[1] >= 0) gl.vertexAttribPointer(location[1], 4, gl.FLOAT, false, 32, base + 16);
+    const base = mirror ? list.length * 36 : 0;
+    if (location[0] >= 0) gl.vertexAttribPointer(location[0], 4, gl.FLOAT, false, 36, base);
+    if (location[1] >= 0) gl.vertexAttribPointer(location[1], 4, gl.FLOAT, false, 36, base + 16);
+    if (location[2] >= 0) gl.vertexAttribPointer(location[2], 1, gl.FLOAT, false, 36, base + 32);
     gl.bindVertexArray(null);
     draw(o, mirror);
   }

@@ -156,33 +156,36 @@ void main() {
     if (stump && y > 0.8) color = mix(vec3(0.16, 0.12, 0.08), color, 0.4);   // letokruhy
     lit = stump ? 0.5 + 0.5 * top : 0.35 + 0.65 * smoothstep(0.0, 0.75, y);
   } else if (vKind > 3.5) {
-    // Trs trávy: sedm stébel z jednoho místa do vějíře, na některých kvítek.
+    // Trs smilky a metličky: dvanáct stébel z jednoho místa do vějíře, kvítek jen občas
+    // (tundra na hřebenech kvete skromně: zvonky, jestřábníky).
     if (uWinter > 0.5) discard;                       // pod sněhem
     float best = 9.0, tipFlower = 9.0;
     vec2 p = vec2(x, y);
-    for (int i = 0; i < 7; i++) {
+    // Stéblo aspoň na šířku pixelu: zdálky by tenká stébla zmizela a zůstalo by jen kvítí.
+    float pixel = fwidth(x);
+    for (int i = 0; i < 12; i++) {
       float fi = float(i);
       float h = hash12(vec2(fi, vSeed * 61.0));
       vec2 a = vec2((h - 0.5) * 0.5, 0.0);
       vec2 b = vec2(a.x + (h - 0.5) * 1.1 + 0.25 * sin(fi * 2.1 + vSeed * 9.0), 0.55 + 0.45 * hash12(vec2(fi + 7.0, vSeed * 13.0)));
       vec2 pa = p - a, ba = b - a;
       float t = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-      float d = length(pa - ba * t) - 0.05 * (1.0 - t);
+      float d = length(pa - ba * t) - max(0.065 * (1.0 - 0.8 * t), pixel * 0.6);
       best = min(best, d);
-      if (hash12(vec2(fi + 3.0, vSeed * 29.0)) < 0.35) tipFlower = min(tipFlower, length(p - b) - 0.09);
+      if (hash12(vec2(fi + 3.0, vSeed * 29.0)) < 0.03) tipFlower = min(tipFlower, length(p - b) - 0.06);
     }
     // Kvete v létě, na jaře (květen) pampelišky a jarní kvítí.
     bool flower = tipFlower < 0.0 && (summer > 0.6 || uSpring > 0.5);
     if (best > 0.0 && !flower) discard;
     width = 1.0;
-    vec3 grass = mix(vec3(0.05, 0.09, 0.025), vec3(0.09, 0.12, 0.035), fract(vSeed * 5.1));
+    vec3 grass = mix(vec3(0.06, 0.075, 0.03), vec3(0.11, 0.105, 0.045), fract(vSeed * 5.1));   // olivová až slámová
     grass = mix(grass, vec3(0.13, 0.11, 0.05), uAutumn * 0.8);
     color = grass * (0.7 + 0.5 * y);
     lit = 0.45 + 0.55 * y;
     if (flower) {
       float pick = fract(vSeed * 17.3);
-      // Alpské kvítí: kopretiny, pryskyřníky, zvonky, hvozdíky.
-      color = pick < 0.35 ? vec3(0.75, 0.75, 0.7) : pick < 0.6 ? vec3(0.75, 0.6, 0.05) : pick < 0.85 ? vec3(0.25, 0.15, 0.55) : vec3(0.6, 0.15, 0.3);
+      // Krkonošské kvítí: jestřábníky (žluté), zvonky (fialové), řeřišničník (bílý).
+      color = pick < 0.5 ? vec3(0.75, 0.6, 0.05) : pick < 0.85 ? vec3(0.25, 0.15, 0.55) : vec3(0.7, 0.7, 0.66);
       // Jaro: hlavně žluté pampelišky a blatouchy, k tomu bílé sasanky.
       if (uSpring > 0.5) color = pick < 0.7 ? vec3(0.8, 0.62, 0.03) : vec3(0.78, 0.78, 0.74);
       lit = 0.9;
@@ -515,7 +518,8 @@ export async function createTrees(gl, { map, random }) {
     const list = [];
     const step = 0.0072;
     const halfWidth = (world.aspect * world.span) / 2 + 0.05;
-    for (let z = 0.06; z < TREE_NEAR; z += step) {
+    // Kamera stojí na plošině nad Úpskou jámou: kleč a stromky už od 14 m (popředí).
+    for (let z = 0.014; z < TREE_NEAR; z += step) {
       yield;
       for (let x = -halfWidth * z - 0.02; x < halfWidth * z + 0.02; x += step) {
         const px = x + (random() - 0.5) * step, pz = z + (random() - 0.5) * step;
@@ -542,7 +546,8 @@ export async function createTrees(gl, { map, random }) {
           // Nad hranicí lesa (od ~1600 m n. m., 650 m nad jezerem níž už jen na
           // mírnějších místech) kleč: husté nízké keře kosodřeviny ve skupinách.
           if (ground > 1.25 && random() < 0.6 * smooth(0.45, 0.7, vnoise(px * 50 + 31, pz * 50 + 7))) {
-            const size = 0.0015 + random() * 0.0015;
+            // Kleč je nízká (1–1,5 m) a široká; dál od kamery trochu větší shluky.
+            const size = (0.0009 + random() * 0.0007) * (1 + Math.min(1, pz * 2));
             list.push([px, ground - 0.0003, pz, size, size * (2.0 + random()), 0.217 + random() * 0.05, 3, 0]);
             continue;
           }
@@ -593,6 +598,19 @@ export async function createTrees(gl, { map, random }) {
         }
       }
     }
+    // Kleč na plošině před hranou Úpské jámy (18–45 m před kamerou; za hranou ji obrys
+    // schová): nízké široké polštáře ve skupinách, po stranách víc, uprostřed jen občas.
+    for (let z = 0.018; z < 0.045; z += 0.0025) {
+      yield;
+      for (let x = -halfWidth * z - 0.005; x < halfWidth * z + 0.005; x += 0.0025) {
+        const px = x + (random() - 0.5) * 0.0025, pz = z + (random() - 0.5) * 0.0025;
+        const side = Math.max(0.18, smooth(0.15, 0.45, Math.abs(px / pz)));
+        if (random() > 0.75 * side * smooth(0.35, 0.6, vnoise(px * 70 + 3, pz * 70 + 11))) continue;
+        const ground = map.sampleFine(px, pz);
+        const size = 0.0006 + random() * 0.0005;
+        list.push([px, ground - 0.0002, pz, size, size * (1.8 + random()), 0.217 + random() * 0.05, 3, 0]);
+      }
+    }
     // Rákosí a ostřice na mělčinách podél břehu (do 1 km), v pásech, ne všude.
     for (let z = 0.08; z < 1.0; z += 0.002 * (1 + z * 3)) {
       yield;
@@ -608,9 +626,10 @@ export async function createTrees(gl, { map, random }) {
     }
     // Trsy trávy a kvítí na loukách (do 900 m), ne v hustém lese ani ve skalách. Dál od
     // kamery řidší a větší (na obrazovce stejně husté), ať jich není zbytečně mnoho.
-    for (let z = 0.06; z < 0.9; z += 0.0016 * (1 + z * 2)) {
+    // Od 6 m před kamerou: tundra na plošině je popředí obrazu (zblízka hustší a drobnější trsy).
+    for (let z = 0.006; z < 0.9; z += (z < 0.08 ? 0.00045 * (1 + z * 12) : 0.0016) * (1 + z * 2)) {
       yield;
-      const grassStep = 0.0016 * (1 + z * 2);
+      const grassStep = (z < 0.08 ? 0.00045 * (1 + z * 12) : 0.0016) * (1 + z * 2);
       for (let x = -halfWidth * z - 0.01; x < halfWidth * z + 0.01; x += grassStep) {
         const px = x + (random() - 0.5) * grassStep, pz = z + (random() - 0.5) * grassStep;
         const ground = map.sampleFine(px, pz);
@@ -621,7 +640,7 @@ export async function createTrees(gl, { map, random }) {
         const gz = (map.sampleFine(px, pz + e) - map.sampleFine(px, pz - e)) / (2 * e);
         if (Math.hypot(gx, gz) > 1.2) continue;                 // skály a strmé svahy
         if (random() > 0.9 * smooth(0.2, 0.55, vnoise(px * 60 + 5, pz * 60 + 1) + 0.25)) continue;
-        const size = (0.0004 + random() * 0.0005) * (1 + z * 1.5);
+        const size = z < 0.08 ? (0.00025 + random() * 0.0002) * (1 + z * 12) : (0.0004 + random() * 0.0005) * (1 + z * 1.5);
         list.push([px, ground - 0.0001, pz, size, size * (1.3 + random() * 0.8), random(), 4, 0]);
       }
     }

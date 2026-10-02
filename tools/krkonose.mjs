@@ -16,7 +16,7 @@ const cache = join(project, 'tools', '.cache');
 mkdirSync(out, { recursive: true });
 mkdirSync(join(cache, 'terrarium'), { recursive: true });
 
-const CAMERA = { lat: 50.72867, lon: 15.71217 };        // hrana Úpské jámy pod Studniční horou (250 m od vrcholu ke Sněžce)
+const CAMERA = { lat: 50.72855, lon: 15.71171 };        // 35 m za hranou Úpské jámy pod Studniční horou: okraj jámy s klečí v popředí
 const SNEZKA = { lat: 50.7360, lon: 15.7399 };
 const MAIN = { spacing: 50, left: -30000, right: 30000, near: -4000, far: 60000 };
 const FINE = { spacing: 5, left: -3000, right: 3000, near: -500, far: 3500 };

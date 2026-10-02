@@ -13,8 +13,9 @@ uniform float uMirror;    // 1 = zrcadlit krajinu (ikony vpravo)
 uniform vec2 uSeed;
 uniform int uOne;         // vždy 1: meze smyček z uniformu, ať je překladač nerozbalí
 
-// Kamera stojí na Studniční hoře (hrana Úpské jámy, 1 498 m n. m.) ve výšce očí; výšky jsou v km nad mořem.
-const float CAMERA_HEIGHT = 1.5;
+// Kamera stojí na Studniční hoře 35 m za hranou Úpské jámy (zem 1 507 m n. m., viz teren.json
+// cameraGround) ve výšce očí; výšky jsou v km nad mořem. Po přesunu kamery v tools/krkonose.mjs upravit.
+const float CAMERA_HEIGHT = 1.5088;
 const float SKY_DEPTH = 1000.0;
 
 vec3 rayDirection(vec2 uv) {

@@ -35,6 +35,7 @@ uniform vec4 uRot;          // směry východ a sever v souřadnicích scény (x
 uniform sampler2D uDepth;   // G-buffer: alfa = vzdálenost terénu (km)
 uniform sampler2D uShadow;
 uniform float uWinter;
+uniform float uRime;
 out vec4 outColor;
 ${NOISE}
 ${CAMERA}
@@ -85,7 +86,7 @@ vec3 albedo(float m, vec3 p) {
   vec3 c = m == 1.0 ? vec3(0.62, 0.64, 0.66) : m == 2.0 ? vec3(0.05, 0.06, 0.07)
          : m == 3.0 ? vec3(0.10, 0.08, 0.06) : m == 4.0 ? vec3(0.26, 0.18, 0.11) : vec3(0.22, 0.21, 0.20);
   // V zimě námraza a sníh: všechno bělavé, střechy bílé.
-  float frost = uWinter * (m == 3.0 ? 1.0 : 0.6);
+  float frost = max(uWinter, uRime) * (m == 3.0 ? 1.0 : 0.6);
   return mix(c, vec3(0.78, 0.80, 0.84), frost);
 }
 
@@ -174,6 +175,7 @@ export async function createSummit(gl, { map }) {
       gl.uniform1f(u.uOvercast, o.overcast || 0);
       gl.uniform1f(u.uFlash, o.flash || 0);
       gl.uniform1f(u.uWinter, o.season.winter);
+      gl.uniform1f(u.uRime, o.rime || 0);
       gl.bindVertexArray(vao);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       gl.bindVertexArray(null);

@@ -107,6 +107,8 @@ console.warn(`Překlad shaderů terénu: ${createTerrain.compileMs} ms`);
 console.warn('Překlad programů (ms): ' + compileTimes.map(([l, ms, how]) => `${l} ${ms} ${how}`).join(', '));
 
 const state = {
+  ridgeShift: [0, 0],     // posun mraků přes hřeben větrem (km)
+  ridgeDir: [1, 0],       // kam vítr fouká (jednotkový vektor ve scéně)
   view: [1, 1],
   dpr: 1,
   pixels: [1, 1],
@@ -255,7 +257,7 @@ function seasonKey(season) {
 // Skutečné počasí v Gosau (config.pocasi = 'skutecne'); jen když scéna ukazuje
 // skutečný okamžik, ne pevnou hodinu, jiný měsíc nebo přehrávání dne.
 // Náhled: ?pocasi=nizka:80,stredni:90,vysoka:20,vitr:12,smer:270,naraz:20,srazky:2,snih:0,
-// teplota:10,kod:95,viditelnost:5000,inverze:1,vrstva:1150 nasimuluje počasí (nic se nestahuje;
+// teplota:10,kod:95,viditelnost:5000,inverze:1,vrstva:1150,namraza:1 nasimuluje počasí (nic se nestahuje;
 // inverze = moře mlhy pod hřebenem, vrstva = výška její horní hranice v m n. m.).
 function weatherFromUrl(text) {
   if (!text) return null;
@@ -272,6 +274,7 @@ function weatherFromUrl(text) {
     rain: (v.teplota ?? 10) > 1.5 ? v.srazky ?? 0 : 0, snowfall: v.snih ?? 0, code: v.kod ?? 0,
     cover: Math.max(low, mid, high), low, mid, high, visibility: v.viditelnost ?? 30000,
     wind, direction: v.smer ?? 250, gusts: v.naraz ?? wind * 1.5,
+    rime: v.namraza !== undefined ? Math.min(1, Math.max(0, v.namraza)) : undefined,
     inversion: Math.min(1, Math.max(0, v.inverze ?? 0)), fogTop: v.vrstva ? v.vrstva / 1000 : undefined,
   };
 }
@@ -293,6 +296,15 @@ function inventedInversion(now) {
   const hour = now.date.getHours() + now.date.getMinutes() / 60;
   return 1 - smoothstep01((hour - 10) / 3) + 0.6 * smoothstep01((hour - 19) / 3);
 }
+// Námraza bez skutečných údajů: v přechodném období (pozdní podzim, předjaří, málo sněhu)
+// některé dny, v zimě slabší na všem, co ze sněhu vyčnívá.
+function inventedRime(now) {
+  const day = Math.floor(now.date.getTime() / 86400000);
+  const w = now.season.winter;
+  if (w > 0.7) return 0.5;
+  if (w < 0.02 && now.season.autumn < 0.7) return 0;
+  return randomGenerator(day ^ 0x5eed)() < 0.45 ? 1 : 0;
+}
 const fogTopFor = (now) => 0.95 + 0.25 * randomGenerator(Math.floor(now.date.getTime() / 86400000) ^ 0x77)();
 
 function weatherTarget(now) {
@@ -300,7 +312,7 @@ function weatherTarget(now) {
   if (!w) {
     const invented = Math.min(1, Math.max(0, config.mraky.pokryti + (now.season.cloudiness - 0.45)));
     const inversion = Math.min(1, inventedInversion(now));
-    return { real: 0, low: invented * (1 - inversion), mid: 0, high: invented, wind: 3, direction: 250, gustiness: 0,
+    return { real: 0, rime: inventedRime(now), ridge: invented > 0.6 ? 0.5 : 0, low: invented * (1 - inversion), mid: 0, high: invented, wind: 3, direction: 250, gustiness: 0,
       snow: snowWanted(now), mist: 1, overcast: 0, rain: 0, storm: 0, inversion, fogTop: fogTopFor(now) };
   }
   const cold = w.temperature < 1.5;
@@ -316,8 +328,15 @@ function weatherTarget(now) {
     rain > 0 || falling ? (w.code >= 80 && w.code <= 82 ? 0.25 : 0.75) : 0, storm * 0.85);
   // Při inverzi je nízká oblačnost pod námi (moře mlhy), ne na obloze.
   const inversion = w.inversion || 0;
+  // Námraza: mráz a vlhko (mlha, nízká oblačnost na hřebeni, špatná viditelnost).
+  const frost = smoothstep01(-w.temperature / 3);
+  const damp = Math.max(fog, smoothstep01((w.low - 0.6) / 0.3), 1 - smoothstep01((w.visibility - 1000) / 5000));
+  const rime = w.rime ?? frost * Math.max(damp, 0.35);
+  // Mraky přes hřeben: nízká oblačnost kolem výšky hřebene a silný vítr (ne při inverzi,
+  // kdy je oblačnost pod námi, a ne v souvislém dešti).
+  const ridge = smoothstep01((w.low - 0.25) / 0.45) * smoothstep01((w.wind - 4) / 7) * (1 - inversion) * (1 - rain * 0.5);
   return {
-    overcast: overcast * (1 - inversion), rain, storm, inversion, fogTop: w.fogTop ?? fogTopFor(now),
+    overcast: overcast * (1 - inversion), rain, storm, inversion, rime, ridge, fogTop: w.fogTop ?? fogTopFor(now),
     real: 1, low: w.low * (1 - inversion), mid: w.mid, high: w.high, wind: w.wind, direction: w.direction,
     gustiness: Math.min(0.7, Math.max(0, (w.gusts - 6) / 14)),
     snow: state.time < state.snowUntil ? 1 : falling ? Math.min(1, 0.35 + w.snowfall * 0.9 + w.precipitation * 0.3) : 0,
@@ -387,6 +406,15 @@ function simulate(dt) {
   // Mraky táhnou po větru (směr odkud fouká + 180°), rychleji při silném větru.
   const wind = config.mraky.rychlost * 0.0012 * (0.4 + state.wx.wind / 5) * (1 + state.gust * 3);
   const toward = (state.wx.direction + 180) * Math.PI / 180;
+  // Cáry mraků přes hřeben letí skutečnou rychlostí větru (m/s → km), směr převedený
+  // ze světových stran do souřadnic scény (z = směr pohledu kamery).
+  {
+    const az = heightMap.azimuth * Math.PI / 180, speed = Math.max(state.wx.wind, 3) * (1 + state.gust * 0.5) / 1000;
+    const e = Math.sin(toward), n = Math.cos(toward);
+    state.ridgeDir = [e * Math.cos(az) - n * Math.sin(az), e * Math.sin(az) + n * Math.cos(az)];
+    state.ridgeShift[0] += state.ridgeDir[0] * speed * dt;
+    state.ridgeShift[1] += state.ridgeDir[1] * speed * dt;
+  }
   state.cloudShift[0] -= Math.sin(toward) * wind * dt;
   state.cloudShift[1] -= Math.cos(toward) * wind * dt;
   const snow = state.wx.snow;
@@ -469,7 +497,8 @@ function render() {
     humid: Math.min(1, Math.max(state.wx.rain * 1.2, smoothstep01((state.wx.overcast - 0.45) / 0.45) * 0.7,
       current.season.autumn * Math.max(0, 1 - Math.abs(current.date.getHours() + current.date.getMinutes() / 60 - 8) / 3) * (1 - state.wx.high * 0.3)) * (current.season.ice > 0.7 ? 0.3 : 1)),
     meteor: { seed: state.meteorSeed, age: time - state.meteorAt },
-    inversion: state.wx.inversion || 0, fogTop: state.wx.fogTop || 1.1,
+    inversion: state.wx.inversion || 0, fogTop: state.wx.fogTop || 1.1, rime: state.wx.rime || 0,
+    ridge: state.wx.ridge || 0, ridgeShift: state.ridgeShift, ridgeDir: state.ridgeDir, peak: heightMap.places.snezka,
     flash: flashAt(time - state.strikeAt) * (0.5 + 0.5 * (1 - Math.max(0, current.sun[1]) * 2)),
     bolt: state.bolt, boltAlpha: flashAt(time - state.strikeAt) > 0.05 ? Math.min(1, flashAt(time - state.strikeAt) * 1.5) : 0,
     sun: current.sun, moon: current.moon, moonPhase: current.moonPhase,

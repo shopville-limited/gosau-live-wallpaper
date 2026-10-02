@@ -470,3 +470,15 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Krkonoše: moře mlhy při inverzi (podzimní ráno), Sněžka nad oblačností](78-krkonose-more-mlhy-pri-inverzi-podzimni.jpg)
 
+## 79. Krkonoše: námraza – ojíněná tundra, kleč a balvany za mrazu a mlhy
+
+*2026-10-02 18:31*
+
+![Krkonoše: námraza – ojíněná tundra, kleč a balvany za mrazu a mlhy](79-krkonose-namraza-ojinena-tundra-klec-a-b.jpg)
+
+## 80. Krkonoše: mrak přes hřeben – čepice na Sněžce při silném větru
+
+*2026-10-02 18:31*
+
+![Krkonoše: mrak přes hřeben – čepice na Sněžce při silném větru](80-krkonose-mrak-pres-hreben-cepice-na-snez.jpg)
+

@@ -80,6 +80,7 @@ uniform sampler2D uDepth;       // G-buffer (alfa = vzdálenost terénu), bez fi
 uniform sampler2D uShadow;
 uniform vec2 uPixels;
 uniform float uWinter;
+uniform float uRime;          // námraza 0..1 (mráz a mlha)
 uniform float uAutumn;
 uniform float uSpring;
 uniform float uReflect;
@@ -175,12 +176,14 @@ void main() {
       if (hash12(vec2(fi + 3.0, vSeed * 29.0)) < 0.03) tipFlower = min(tipFlower, length(p - b) - 0.06);
     }
     // Kvete v létě, na jaře (květen) pampelišky a jarní kvítí.
-    bool flower = tipFlower < 0.0 && (summer > 0.6 || uSpring > 0.5);
+    bool flower = tipFlower < 0.0 && (summer > 0.6 || uSpring > 0.5) && uRime < 0.3;   // v mrazu nekvete
     if (best > 0.0 && !flower) discard;
     width = 1.0;
     vec3 grass = mix(vec3(0.06, 0.075, 0.03), vec3(0.11, 0.105, 0.045), fract(vSeed * 5.1));   // olivová až slámová
     grass = mix(grass, vec3(0.115, 0.1, 0.055), uAutumn * 0.65);
     color = grass * (0.7 + 0.5 * y);
+    // Námraza: stébla obalená jinovatkou, nejvíc ke špičkám.
+    color = mix(color, vec3(0.32, 0.33, 0.35), uRime * (0.15 + 0.6 * y * y));
     lit = 0.45 + 0.55 * y;
     if (flower) {
       float pick = fract(vSeed * 17.3);
@@ -205,6 +208,8 @@ void main() {
     color = pick < 0.45 ? blueberry : pick < 0.8 ? fern : young;
     color = mix(color, vec3(0.6, 0.62, 0.66), uWinter * smoothstep(0.3, 0.8, y + 0.3 * leafNoise));
     color *= 0.75 + 0.5 * leafNoise;
+    // Námraza na kleči a keřích: bílé jehličí na vrchu a na koncích větví.
+    color = mix(color, vec3(0.3, 0.31, 0.33), uRime * smoothstep(0.3, 1.0, y + 0.4 * leafNoise) * 0.6);
     lit = (0.3 + 0.7 * smoothstep(-0.6, 0.8, q.y)) * (0.8 + 0.3 * leafNoise);
   } else if (!broadleaf) {
     // Smrk (a modřín): kužel z pater převislých větví, každé patro zubaté do stran.
@@ -706,6 +711,7 @@ export async function createTrees(gl, { map, random }) {
       gl.uniform1f(u.uOvercast, o.overcast || 0);
       gl.uniform1f(u.uFlash, 0);
       gl.uniform1f(u.uWinter, o.season.winter);
+      gl.uniform1f(u.uRime, o.rime || 0);
       gl.uniform1f(u.uAutumn, o.season.autumn);
       gl.uniform1f(u.uSpring, o.season.spring);
       gl.uniform1f(u.uExposure, o.exposure);
@@ -760,6 +766,7 @@ export async function createTrees(gl, { map, random }) {
       gl.uniform1f(u.uOvercast, o.overcast || 0);
       gl.uniform1f(u.uFlash, o.flash || 0);
       gl.uniform1f(u.uWinter, o.season.winter);
+      gl.uniform1f(u.uRime, o.rime || 0);
       gl.uniform1f(u.uAutumn, o.season.autumn);
       gl.uniform1f(u.uSpring, o.season.spring);
       // Nejdřív stíny na zem (násobení barvy), pak stromy.

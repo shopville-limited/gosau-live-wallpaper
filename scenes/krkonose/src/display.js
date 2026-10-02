@@ -44,6 +44,11 @@ uniform vec2 uCloudShift;        // posun mraků větrem
 uniform float uRipple;           // zčeření hladiny
 uniform float uGust;             // poryv větru 0..1
 uniform float uMist;
+uniform float uRime;            // námraza 0..1: jinovatka na tundře
+uniform float uRidge;           // mraky přes hřeben 0..1 (vítr a nízká oblačnost)
+uniform vec2 uRidgeShift;       // jejich posun větrem (km)
+uniform vec2 uRidgeDir;         // kam vítr fouká (jednotkový vektor)
+uniform vec2 uPeak;             // vrchol Sněžky (x, z v km)
 uniform float uInversion;       // moře mlhy pod hřebenem 0..1 (inverze)
 uniform float uFogTop;          // horní hranice vrstvy (km n. m.)
 uniform float uIce;              // zamrzlé jezero 0..1
@@ -337,6 +342,9 @@ vec3 mistColor() {
 // Osvětlení terénu v bodě obrazovky.
 vec3 litTerrain(vec2 uv, Material m, vec3 rd, float t) {
   vec3 P = vec3(0.0, CAMERA_HEIGHT, 0.0) + rd * t;
+  // Námraza: tundra a kleč nad ~1 200 m zbělají jinovatkou (dole v lese ne).
+  m.albedo = mix(m.albedo, vec3(0.19, 0.2, 0.215),
+                 uRime * 0.6 * smoothstep(1.15, 1.3, P.y) * (1.0 - m.snow) * (1.0 - 0.6 * m.forest));
   vec3 n = m.normal;
   // Vítr v lese: každá koruna se pohupuje po svém, přes les se přelévají poryvy.
   float near = 1.0 - smoothstep(1.5, 7.0, t);
@@ -826,6 +834,66 @@ vec4 fogSea(vec3 rd, float sceneDist) {
   return vec4(col, clamp(alpha, 0.0, 1.0));
 }
 
+// Mraky přes hřeben: při silném větru a nízké oblačnosti se přes vrchol Sněžky valí mrak
+// skutečnou rychlostí větru: čepice na vrcholu a vlajka protažená po větru za ním. Paprsek
+// projde okolí vrcholu ve 20 krocích a skládá krytí zepředu. Plochý 2D šum by se v tenké
+// vrstvě viděné z boku sbíhal k obzoru do vějíře, proto hladký tvar a 3D šum.
+// Levný 3D šum: dvě vrstvy 2D šumu posunuté podle celé části y, prolnuté podle zbytku.
+float noise3t(vec3 p) {
+  float iz = floor(p.y), fz = p.y - iz;
+  fz = fz * fz * (3.0 - 2.0 * fz);
+  return mix(texture(uNoise, p.xz + iz * vec2(0.37, 0.61)).r, texture(uNoise, p.xz + (iz + 1.0) * vec2(0.37, 0.61)).r, fz);
+}
+
+vec4 ridgeCloud(vec3 rd, float sceneDist) {
+  if (uRidge < 0.01 || rd.y <= 0.0) return vec4(0.0);
+  // Paprsek, který míjí vrchol i vlajku za ním o víc než ~1,2 km, nic nepotká (úspora GPU).
+  vec2 dir2 = normalize(rd.xz);
+  vec2 tail = uPeak + uRidgeDir * 1.3;
+  if (min(abs(dir2.x * uPeak.y - dir2.y * uPeak.x), abs(dir2.x * tail.y - dir2.y * tail.x)) > 1.2) return vec4(0.0);
+  const float LOW = 1.53, HIGH = 1.85;
+  float t0 = (LOW - CAMERA_HEIGHT) / rd.y, t1 = min((HIGH - CAMERA_HEIGHT) / rd.y, min(sceneDist, 6.0));
+  // Jen úsek paprsku kolem vrcholu (od 1 km před ním po 2,5 km za ním), ať jsou kroky jemné.
+  float tp = dot(rd.xz, uPeak) / max(dot(rd.xz, rd.xz), 1e-4);
+  t0 = max(t0, tp - 0.7);
+  t1 = min(t1, tp + 2.0);
+  if (t0 >= t1) return vec4(0.0);
+  vec3 zenith, horizon;
+  palette(uSun.y, zenith, horizon);
+  vec3 lit = mix(horizon, zenith, 0.35) * 0.95 + sunLight() * 0.3 + moonLight() * 0.6;
+  vec3 dark = mix(horizon, zenith, 0.5) * 0.6 + moonLight() * 0.3;
+  float dt = (t1 - t0) / 20.0;
+  // Posun vzorků po pixelech (gradientní šum, v čase stálý): kroky nedělají pruhy.
+  float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+  vec4 acc = vec4(0.0);
+  for (int i = 0; i < 20 * uOne; i++) {
+    float t = t0 + (float(i) + jitter) * dt;
+    vec3 P = vec3(0.0, CAMERA_HEIGHT, 0.0) + rd * t;
+    // Tvar: čepice na vrcholu a vlajka za ním po větru (širší a řidší dál od vrcholu),
+    // svisle nadýchaná vrstva kolem 1 650 m n. m.
+    vec2 rel = P.xz - uPeak;
+    float along = dot(rel, uRidgeDir), across = dot(rel, vec2(-uRidgeDir.y, uRidgeDir.x));
+    float width = 0.28 + 0.22 * max(along, 0.0);
+    float body = exp(-pow(across / width, 2.0)) * smoothstep(-0.45, 0.05, along) * (1.0 - smoothstep(0.6, 2.2, along));
+    float lift = 0.035 * max(along, 0.0);                      // za vrcholem cár stoupá
+    float vert = exp(-pow((P.y - 1.625 - lift) / (0.055 + 0.035 * max(along, 0.0)), 2.0));
+    vec3 w = vec3((P.xz - uRidgeShift) * 0.9, P.y * 14.0).xzy;
+    float n = noise3t(w) * 0.65 + noise3t(w * 2.7 + 3.1) * 0.35;
+    // Šum vykusuje díry a roztrhané okraje (cáry se trhají a znovu tvoří, jak táhnou).
+    float d = clamp((body * vert - 0.25 + (n - 0.5) * 1.6) * 2.6, 0.0, 1.0) * smoothstep(0.04, 0.2, body * vert);
+    float a = 1.0 - exp(-d * dt * 30.0);
+    float h = (P.y - LOW) / (HIGH - LOW);
+    vec3 col = mix(dark, lit, smoothstep(0.1, 0.6, h + 0.3 * n) * (1.0 - 0.3 * d));
+    acc.rgb += (1.0 - acc.a) * a * col;
+    acc.a += (1.0 - acc.a) * a;
+    if (acc.a > 0.97) break;
+  }
+  // Vzduch mezi okem a mrakem.
+  vec3 transmit = exp(-vec3(0.020, 0.028, 0.042) * tp);
+  acc.rgb = acc.rgb * transmit + skyColor(normalize(vec3(rd.x, 0.05, rd.z))) * 0.95 * (1.0 - transmit) * acc.a;
+  return vec4(acc.rgb, acc.a * uRidge);
+}
+
 vec3 aces(vec3 x) {
   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
 }
@@ -906,6 +974,8 @@ void main() {
   }
   vec4 sea = fogSea(rd, sceneDist);
   c = mix(c, sea.rgb, sea.a);
+  vec4 ridge = ridgeCloud(rd, sceneDist);
+  c = c * (1.0 - ridge.a) + ridge.rgb * uRidge;
   // Cáry mraků na svazích (viz slopeWisp) a jejich odraz v hladině: zrcadlený paprsek
   // najde na obrazovce bod svahu, který se v daném místě vody zrcadlí.
   if (uHumid > 0.01) {
@@ -1077,6 +1147,11 @@ export async function createDisplay(gl) {
       gl.uniform1f(u.uGust, o.gust);
       gl.uniform1f(u.uMist, o.mist);
       gl.uniform1f(u.uInversion, o.inversion || 0);
+      gl.uniform1f(u.uRidge, o.ridge || 0);
+      if (o.ridgeShift) gl.uniform2f(u.uRidgeShift, o.ridgeShift[0], o.ridgeShift[1]);
+      if (o.ridgeDir) gl.uniform2f(u.uRidgeDir, o.ridgeDir[0], o.ridgeDir[1]);
+      if (o.peak) gl.uniform2f(u.uPeak, o.peak[0], o.peak[1]);
+      gl.uniform1f(u.uRime, o.rime || 0);
       gl.uniform1f(u.uFogTop, o.fogTop || 1.1);
       gl.uniform1f(u.uIce, o.ice);
       gl.uniform1f(u.uSnowfall, o.snowfall);

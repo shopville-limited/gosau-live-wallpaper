@@ -90,6 +90,7 @@ uniform float uExposure;
 uniform float uContrast;
 uniform float uTonemap;       // 1 = rovnou do obrazovky (odraz), 0 = do obrazu scény (HDR)
 uniform float uWinter;
+uniform float uRime;          // námraza 0..1
 uniform float uIce;
 uniform float uRainWet;       // déšť: mokrý kámen
 uniform sampler2D uShadow;
@@ -231,6 +232,9 @@ void main() {
   stone = mix(stone, vec3(0.05, 0.07, 0.03), moss * 0.5 * (1.0 - uWinter));
   float snow = uWinter * smoothstep(0.35, 0.75, n.y + 0.2 * noise3(wp * 1.5)) * smoothstep(0.3, 0.6, p.y);
   stone = mix(stone, vec3(0.82, 0.84, 0.88), snow);
+  // Námraza: krusta jinovatky, ve skvrnách (narůstá na výstupcích a hranách).
+  float rime = uRime * (0.2 + 0.3 * smoothstep(0.4, 0.7, noise3(wp * 14.0 + 5.0) * 0.5 + 0.5) + 0.2 * max(n.y, 0.0));
+  stone = mix(stone, vec3(0.3, 0.31, 0.33), rime * (1.0 - snow));
   // Za deště je celý kámen mokrý: tmavší a lesklejší.
   stone *= 1.0 - 0.35 * uRainWet * (1.0 - snow);
   wet = max(wet, uRainWet * 0.6);
@@ -345,6 +349,7 @@ export async function createBoulders(gl, { map }) {
     gl.uniform1f(u.uContrast, o.contrast);
     gl.uniform1f(u.uTonemap, mirror ? 1 : 0);
     gl.uniform1f(u.uWinter, o.season.winter);
+    gl.uniform1f(u.uRime, o.rime || 0);
     gl.uniform1f(u.uIce, o.ice || 0);
     gl.uniform1f(u.uRainWet, o.rain || 0);
     gl.enable(gl.BLEND);

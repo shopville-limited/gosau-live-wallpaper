@@ -111,7 +111,7 @@ vec4 canopy(vec2 p, float density, float ground) {
   vec2 cellCenter = (id + 0.5) / 140.0;
   float clearing = smoothstep(0.25, 0.55, gnoise(cellCenter * 16.0 + uSeed * 3.0) * 0.5 + 0.5 + 0.12);
   // Kleč nad hranicí lesa roste v souvislých skupinách a pásech, ne jako jednotlivé keře.
-  float dwarfZone = smoothstep(1.17, 1.32, ground);   // Krkonoše: les končí kolem 1 250 m
+  float dwarfZone = smoothstep(1.08, 1.22, ground);   // Krkonoše: les končí kolem 1 250 m
   float patches = smoothstep(0.52, 0.66, gnoise(cellCenter * 28.0 + uSeed * 5.0 + 3.7) * 0.5 + 0.5);
   clearing = mix(clearing, patches * 1.4, dwarfZone);
   // Řídký les roste ve skupinkách: kde je hustota nízká, rozhoduje šum shluků,
@@ -127,7 +127,7 @@ vec4 canopy(vec2 p, float density, float ground) {
                   + 0.05 * sin(angle * 23.0 + seedAngle * 2.3);
   float along = sqrt(best) / (radius * jag);
   if (along >= 1.0) return vec4(0.0, 1.0, pick, 0.0);
-  float dwarf = smoothstep(1.22, 1.36, ground);
+  float dwarf = smoothstep(1.12, 1.26, ground);
   // Různě staré stromy: hodně středních, pár vysokých, mezi nimi mladé.
   float age = hash12(id + 1.7);
   float tall = mix(0.026, 0.005, dwarf) * (0.45 + 0.75 * age * age * (3.0 - 2.0 * age));
@@ -368,7 +368,7 @@ Surface surfaceAt(vec3 p, float t) {
   float grey = noise3(wp * 0.0025 + 7.0) * 0.5 + 0.5;
   // Dachsteinský vápenec: světle šedý, zvětralý do tmavších skvrn, místy lišejníky a řasy.
   // Krkonoše: tmavý svor a žula s lišejníky (ne světlý vápenec).
-  vec3 rock = mix(vec3(0.15, 0.145, 0.135), vec3(0.10, 0.10, 0.105), grey) * (0.85 + 0.25 * detail);
+  vec3 rock = mix(vec3(0.085, 0.078, 0.068), vec3(0.06, 0.058, 0.055), grey) * (0.85 + 0.25 * detail);
   // Kresba skutečného vápence (a mechu u lesa a u vody), váhy os podle hrubé normály.
   vec3 triW = pow(abs(coarse), vec3(4.0));
   triW /= triW.x + triW.y + triW.z;
@@ -381,7 +381,7 @@ Surface surfaceAt(vec3 p, float t) {
   rock = mix(rock, vec3(0.10, 0.10, 0.09), lichen * 0.18);
   // Sutě: kužely a proudy světlejší drti pod stěnami (sklon kolem 35°), protažené dolů
   // po spádnici; mezi nimi pruhy skály a tmavší kleče.
-  vec3 scree = vec3(0.17, 0.16, 0.15) * textureDetail(uGravelColor, uGravelMean, wp * 0.6, triW, footprint * 0.6);
+  vec3 scree = vec3(0.10, 0.093, 0.082) * textureDetail(uGravelColor, uGravelMean, wp * 0.6, triW, footprint * 0.6);
   float screeBand = smoothstep(0.55, 0.72, slope) * (1.0 - smoothstep(0.82, 0.9, slope));
   float fans = smoothstep(0.35, 0.65, noise3(vec3(wp.x * 0.006, wp.y * 0.0015, wp.z * 0.006) + 5.0) * 0.5 + 0.5);
   vec3 albedo;
@@ -440,7 +440,10 @@ Surface surfaceAt(vec3 p, float t) {
 
   // Alpské louky a kleč: na mírnějších svazích nad lesem roste tráva (do asi 2200 m n. m.),
   // na římsách ve stěnách jen trsy. Skalní svah tak není holý jako omítka.
-  float grassy = smoothstep(0.62, 0.8, slope + 0.08 * (detail - 0.5));   // tundra až na vrcholy
+  // Hranice trávy a skály je ostrá a roztřepená (výchozy skal, ne šedé rozmazané skvrny);
+  // tráva a kleč drží i na svazích kolem 50°, holé jsou jen stěny a žlaby.
+  float outcrop = noise3(wp * 0.03 + 71.0) * 0.12 + noise3(wp * 0.12 + 73.0) * 0.05;
+  float grassy = smoothstep(0.5, 0.56, slope + 0.08 * (detail - 0.5) + outcrop);   // tundra až na vrcholy
   // Tundra je souvislá; holá místa jen ve strmých stěnách a balvanová pole na Sněžce.
   grassy *= 1.0 - 0.75 * smoothstep(1.53, 1.6, alt) * smoothstep(0.45, 0.7, noise3(wp * 0.02 + 5.0) * 0.5 + 0.5);
   vec3 alpine = mix(vec3(0.050, 0.060, 0.030), vec3(0.075, 0.072, 0.040), smoothstep(1.35, 1.55, alt));   // smilka, metlička: olivová, výš do žluta
@@ -992,6 +995,8 @@ export async function loadHeightMap(gl, folder) {
     depth: (meta.rows - 1) * meta.spacing,
     glacier: [99, 99],   // ledovec tu není (daleko mimo mapu)
     hut: meta.places.snezka,   // okno: bouda na Sněžce
+    places: meta.places,
+    azimuth: meta.camera.azimuth,
   };
 }
 

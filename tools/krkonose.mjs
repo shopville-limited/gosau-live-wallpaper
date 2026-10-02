@@ -16,7 +16,7 @@ const cache = join(project, 'tools', '.cache');
 mkdirSync(out, { recursive: true });
 mkdirSync(join(cache, 'terrarium'), { recursive: true });
 
-const CAMERA = { lat: 50.7278, lon: 15.7089 };          // Studniční hora, okraj nad Úpskou jámou
+const CAMERA = { lat: 50.72867, lon: 15.71217 };        // hrana Úpské jámy pod Studniční horou (250 m od vrcholu ke Sněžce)
 const SNEZKA = { lat: 50.7360, lon: 15.7399 };
 const MAIN = { spacing: 50, left: -30000, right: 30000, near: -4000, far: 60000 };
 const FINE = { spacing: 5, left: -3000, right: 3000, near: -500, far: 3500 };
@@ -170,6 +170,14 @@ const toU16 = (g) => { const u = new Uint16Array(g.length); for (let i = 0; i < 
 
 // ---- Les: smrčiny do ~1250 m, nad tím řídnou (kleč dokreslí scéna), ne na strmých
 // stěnách karů a v lavinových žlabech ----
+// Hladký hodnotový šum 0..1 (pro ostrůvky kleče).
+const hash = (x, y) => { const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return v - Math.floor(v); };
+function vnoise(x, y) {
+  const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const a = hash(ix, iy), b = hash(ix + 1, iy), c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+  return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+}
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const at = (r, c) => main.grid[Math.min(main.rows - 1, Math.max(0, r)) * main.cols + Math.min(main.cols - 1, Math.max(0, c))];
 const rawForest = new Float32Array(main.cols * main.rows);
@@ -179,7 +187,13 @@ for (let r = 0; r < main.rows; r++) for (let c = 0; c < main.cols; c++) {
   const slope = Math.atan(Math.hypot(gx, gz)) * 180 / Math.PI;
   const around = (at(r, c + 2) + at(r, c - 2) + at(r + 2, c) + at(r - 2, c)) / 4;
   const gully = smooth(3, 10, around - h);
-  rawForest[r * main.cols + c] = (1 - smooth(1180, 1330, h)) * (1 - smooth(38, 50, slope)) * (1 - 0.8 * gully);
+  const trees = (1 - smooth(1060, 1190, h)) * (1 - smooth(38, 50, slope)) * (1 - 0.8 * gully);
+  // Kleč (kosodřevina) nad hranicí lesa do ~1450 m: husté porosty v ostrůvcích a pásech,
+  // ne v lavinových drahách, na strmých skalách a na rovné tundře hřebene.
+  const patch = vnoise(c * 0.35, r * 0.35) * 0.65 + vnoise(c * 1.1 + 17, r * 1.1 + 5) * 0.35;
+  const klec = smooth(1120, 1200, h) * (1 - smooth(1400, 1470, h)) * smooth(0.42, 0.62, patch)
+    * (1 - smooth(35, 48, slope)) * (1 - 0.9 * gully) * 0.85;
+  rawForest[r * main.cols + c] = Math.max(trees, klec);
 }
 const forest = new Uint8Array(main.cols * main.rows);
 for (let r = 0; r < main.rows; r++) for (let c = 0; c < main.cols; c++) {

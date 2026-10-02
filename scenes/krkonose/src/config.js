@@ -36,8 +36,8 @@ export default {
     // Mění sněžnou čáru, barvy lesa, zamrzlé jezero a dráhu slunce.
     mesic: 'skutecny',
     // Místo, pro které se počítá poloha slunce a počasí (Studniční hora).
-    sirka: 50.7278,
-    delka: 15.7089,
+    sirka: 50.7287,
+    delka: 15.7122,
     // Akce „Přehrát den“: celý den za tolik sekund.
     prehratDenZa: 120,
   },

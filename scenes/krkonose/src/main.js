@@ -16,6 +16,7 @@ import { createTrees } from './trees.js';
 import { createWeather } from './weather.js';
 import { createStars } from './stars.js';
 import { createBoulders } from './boulders.js';
+import { createSummit } from './summit.js';
 import { createSnapshotCache } from './snapshot-cache.js';
 import { createParticles } from './particles.js';
 import { solarPosition, direction, moonPhase, moonDirection, seasonFor, skyFrame, MONTHS } from './sky-clock.js';
@@ -91,7 +92,7 @@ try {
 }
 // Všechny shadery se překládají najednou na pozadí (grafický proces), stránka mezitím
 // odpovídá a ukazuje obrázek z minula. Synchronní překlad by ji zablokoval i na 20 s.
-const [terrain, display, boats, trees, boulders, particles, stars] = await Promise.all([
+const [terrain, display, boats, trees, boulders, particles, stars, summit] = await Promise.all([
   createTerrain(gl, heightMap),
   createDisplay(gl),
   createBoats(gl, { map: heightMap, random, config }),
@@ -99,6 +100,7 @@ const [terrain, display, boats, trees, boulders, particles, stars] = await Promi
   createBoulders(gl, { map: heightMap }),
   createParticles(gl, { random }),
   createStars(gl, { url: new URL('../assets/hvezdy.bin', import.meta.url).href }),
+  createSummit(gl, { map: heightMap }),
 ]);
 const birds = createBirds(gl, { config, random });
 console.warn(`Překlad shaderů terénu: ${createTerrain.compileMs} ms`);
@@ -442,10 +444,10 @@ function render() {
     ice: current.season.ice, snowfall: state.snowfall,
     overcast: state.wx.overcast, rain: state.wx.rain * (current.season.ice > 0.7 ? 0 : 1),
     hour: current.date.getHours() + current.date.getMinutes() / 60,
-    // Vlhko pro cáry mraků na svazích: déšť a krátce po něm, zataženo, podzimní ráno.
+    // Vlhko pro cáry mraků na svazích: déšť a krátce po něm, opravdu zataženo (ne pár mráčků), podzimní ráno.
     // Duha: dokud ještě trochu prší nebo chvíli po dešti, když slunce prosvítá (není zataženo).
     rainbow: Math.min(1, state.wx.rain * 3) * (1 - smoothstep01((state.wx.overcast - 0.2) / 0.5)) * (state.wx.real > 0.5 ? 1 : 0),
-    humid: Math.min(1, Math.max(state.wx.rain * 1.2, state.wx.overcast * 0.6,
+    humid: Math.min(1, Math.max(state.wx.rain * 1.2, smoothstep01((state.wx.overcast - 0.45) / 0.45) * 0.7,
       current.season.autumn * Math.max(0, 1 - Math.abs(current.date.getHours() + current.date.getMinutes() / 60 - 8) / 3) * (1 - state.wx.high * 0.3)) * (current.season.ice > 0.7 ? 0.3 : 1)),
     meteor: { seed: state.meteorSeed, age: time - state.meteorAt },
     flash: flashAt(time - state.strikeAt) * (0.5 + 0.5 * (1 - Math.max(0, current.sun[1]) * 2)),
@@ -453,7 +455,7 @@ function render() {
     sun: current.sun, moon: current.moon, moonPhase: current.moonPhase,
     wakes: boats.wakes(),
     trees, season: current.season,
-    stars, boulders, particles, date: current.date, sky: skyFrame(current.date, config.cas.sirka, config.cas.delka),
+    stars, boulders, particles, summit, date: current.date, sky: skyFrame(current.date, config.cas.sirka, config.cas.delka),
     map: heightMap,
   });
   // Odrazy blízkých stromů a rákosí (vzdálenější odraz už je v obrazu vody), pak balvanů.

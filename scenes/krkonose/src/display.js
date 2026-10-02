@@ -977,6 +977,8 @@ export async function createDisplay(gl) {
       if (o.trees && o.fullWeight >= 1) {
         o.trees.draw({ ...o, depth: o.terrain.full.albedo, shadow: o.shadows.to });
       }
+      // Stavby na vrcholu Sněžky.
+      if (o.summit && o.fullWeight >= 1) o.summit.draw({ ...o, depth: o.terrain.full.albedo });
       // Padající listí a sníh z větví.
       if (o.particles) o.particles.draw(o);
       // Balvany v popředí (3D) do obrazu scény.

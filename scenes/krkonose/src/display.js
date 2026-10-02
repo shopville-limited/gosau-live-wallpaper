@@ -49,6 +49,7 @@ uniform float uRidge;           // mraky přes hřeben 0..1 (vítr a nízká obl
 uniform vec2 uRidgeShift;       // jejich posun větrem (km)
 uniform vec2 uRidgeDir;         // kam vítr fouká (jednotkový vektor)
 uniform vec2 uPeak;             // vrchol Sněžky (x, z v km)
+uniform vec4 uTowns[4];         // města pod mořem mlhy: x, z (km), síla, poloměr (km)
 uniform float uInversion;       // moře mlhy pod hřebenem 0..1 (inverze)
 uniform float uFogTop;          // horní hranice vrstvy (km n. m.)
 uniform float uIce;              // zamrzlé jezero 0..1
@@ -253,6 +254,23 @@ vec3 rainbow(vec3 rd) {
   return c * sunLight() * 0.035 * uRainbow;
 }
 
+// Krajina za okrajem mapy (přes 60 km): úplně zahalená oparem, o kousek tmavší než obloha
+// u obzoru, bez hvězd a bez odrazů.
+vec3 farLand(vec3 rd) {
+  // Stejná vzdušná perspektiva jako u terénu (viz litTerrain), pro tmavou zem asi 70 km daleko.
+  float t = 70.0;
+  vec3 zenith, horizon;
+  palette(uSun.y, zenith, horizon);
+  vec3 ground = vec3(0.025, 0.03, 0.03) * (sunLight() * max(uSun.y, 0.0) + mix(horizon, zenith, 0.5) * 0.8);
+  float density = exp(-0.35 * 0.55);
+  vec3 airColor = skyColor(normalize(vec3(rd.x, 0.05, rd.z)));
+  vec3 transmit = exp(-vec3(0.020, 0.028, 0.042) * t * density);
+  float mie = 1.0 - exp(-t * 0.012 * exp(-0.35 * 1.5));
+  vec3 sunGlow = sunLight() * pow(max(dot(rd, uSun), 0.0), 6.0) * 0.08;
+  vec3 c = ground * transmit + airColor * (1.0 - transmit) * 0.95;
+  return mix(c, mix(horizon, vec3(0.8) * smoothstep(-0.05, 0.15, uSun.y), 0.3) * 0.9 + sunGlow, mie * 0.35);
+}
+
 vec3 skyWithClouds(vec3 rd, vec2 uv) {
   vec3 sky = skyColor(rd) + moonDisk(rd) + meteor(uv) * (1.0 - uOvercast);
   if (rd.y <= 0.004) return sky;
@@ -420,7 +438,7 @@ vec3 litTerrain(vec2 uv, Material m, vec3 rd, float t) {
   float mie = (1.0 - exp(-t * 0.012 * exp(-max(P.y, 0.0) * 1.5)));
   vec3 sunGlow = sunLight() * pow(max(dot(rd, uSun), 0.0), 6.0) * 0.08;
   c = c * transmit + airColor * (1.0 - transmit) * 0.95;
-  c = mix(c, mix(horizon, vec3(0.8), 0.3) * 0.9 + sunGlow, mie * 0.35);
+  c = mix(c, mix(horizon, vec3(0.8) * smoothstep(-0.05, 0.15, uSun.y), 0.3) * 0.9 + sunGlow, mie * 0.35);
   // Mlha v údolí se pomalu převaluje.
   // Údolní mlha a inverze v údolích pod hřebeny (kolem 800–1 000 m n. m.).
   float low = exp(-max(P.y - 0.8, 0.0) / 0.12);
@@ -801,7 +819,10 @@ vec4 fogSea(vec3 rd, float sceneDist) {
   vec2 q = (cam + rd * t).xz;
   vec2 drift = uCloudShift * 0.4;
   float big = texture(uNoise, q * 0.35 + drift).r;
-  float b = big * 0.55 + texture(uNoise, q * 1.3 + drift * 1.6 + 0.3).r * 0.3 + texture(uNoise, q * 4.2 + drift * 2.2 + 0.7).r * 0.15;
+  // Jemné kupy se se vzdáleností vytrácejí (jinak by v dálce kmitaly do svislých pruhů).
+  float fineFade = exp(-t * 0.35), midFade = exp(-t * 0.3);
+  float b = big * 0.55 + mix(0.5, texture(uNoise, q * 1.3 + drift * 1.6 + 0.3).r, midFade) * 0.3
+          + mix(0.5, texture(uNoise, q * 4.2 + drift * 2.2 + 0.7).r, fineFade) * 0.15;
   float top = uFogTop + 0.04 * (b - 0.5);
   t = (CAMERA_HEIGHT - top) / -rd.y;
   // Terén nad vrstvou: těsně nad ní ještě slabý závoj (vlhký opar), ať se hřbety z mlhy
@@ -814,15 +835,20 @@ vec4 fogSea(vec3 rd, float sceneDist) {
   // Normála kup ze sklonu šumu (velká měřítka), ať mají světlou a stinnou stranu.
   float e = 0.15;
   float bx = texture(uNoise, (Q.xz + vec2(e, 0.0)) * 0.35 + drift).r, bz = texture(uNoise, (Q.xz + vec2(0.0, e)) * 0.35 + drift).r;
-  vec3 n = normalize(vec3(-(bx - big) / e * 0.12, 1.0, -(bz - big) / e * 0.12));
+  // Stínování kup jen zblízka; zdálky by se v perspektivě slisovalo do „vln“ jako na hladině.
+  float relief = 0.12 * exp(-length(Q.xz) * 0.15);
+  vec3 n = normalize(vec3(-(bx - big) / e * relief, 1.0, -(bz - big) / e * relief));
   vec3 zenith, horizon;
   palette(uSun.y, zenith, horizon);
   float sunUp = smoothstep(-0.02, 0.06, uSun.y);
   float lambert = max(dot(n, uSun), 0.0) * 0.6 + 0.4 * max(uSun.y, 0.0);
   vec3 sky = mix(horizon, zenith, 0.6) * (0.85 + 0.15 * n.y);
   // Vrcholy kup světlé, prohlubně mezi nimi modravé ve stínu.
-  float crest = smoothstep(0.3, 0.75, b);
-  vec3 col = 0.82 * (sunLight() * lambert * sunUp * mix(0.75, 1.1, crest) + sky * mix(0.7, 1.0, crest) + moonLight() * 0.8);
+  float crest = mix(0.5, smoothstep(0.3, 0.75, b), exp(-length(Q.xz) * 0.08));
+  // V noci svítí na vrstvu jen měsíc a slabá obloha: šedá, ne světlá plocha jako hladina.
+  float night = 1.0 - smoothstep(-0.1, 0.05, uSun.y);
+  vec3 col = 0.82 * (sunLight() * lambert * sunUp * mix(0.75, 1.1, crest) + sky * mix(0.55, 1.0, crest) * mix(1.0, 0.3, night)
+                     + moonLight() * mix(0.5, 1.0, crest) * max(dot(n, uMoon), 0.0));
   // Proti slunci se okraje kup prosvítí (dopředný rozptyl).
   col += sunLight() * 0.25 * pow(max(dot(rd, uSun), 0.0), 8.0) * (1.0 - crest) * sunUp;
   // Vzduch mezi okem a vrstvou (jako u terénu).
@@ -894,6 +920,25 @@ vec4 ridgeCloud(vec3 rd, float sceneDist) {
   return vec4(acc.rgb, acc.a * uRidge);
 }
 
+// Kupole světla nad městy pod mořem mlhy (v noci): mlha zespodu prosvícená pouličním
+// osvětlením rozptyluje světlo do všech stran, takže z hřebene je vidět kulatá teplá záře
+// nad místem města, přes vrstvu i kus nad obzor (ne sloupec jako odraz na hladině).
+vec3 townDomes(vec3 rd, float sceneDist) {
+  float night = 1.0 - smoothstep(-0.1, 0.05, uSun.y);
+  if (uInversion < 0.01 || night <= 0.0) return vec3(0.0);
+  vec3 cam = vec3(0.0, CAMERA_HEIGHT, 0.0);
+  vec3 glow = vec3(0.0);
+  for (int i = 0; i < 4; i++) {
+    vec3 to = vec3(uTowns[i].x, uFogTop, uTowns[i].y) - cam;
+    float dist = length(to);
+    // Bližší terén (hřbet před městem) záři zakryje.
+    if (sceneDist < dist * 0.9) continue;
+    float ang = acos(clamp(dot(rd, to / dist), -1.0, 1.0)) / (uTowns[i].w / dist);
+    glow += vec3(1.0, 0.6, 0.3) * uTowns[i].z * (exp(-ang * ang) * 0.6 + exp(-ang * 0.7) * 0.4);
+  }
+  return glow * 0.015 * night * uInversion;
+}
+
 vec3 aces(vec3 x) {
   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
 }
@@ -908,8 +953,11 @@ void main() {
   vec3 rd = rayDirection(uv);
   // Hloubková paralaxa: blízký terén se posune víc, obloha vůbec.
   float depth = depthAt(uv);
+  // V Krkonoších není voda: paprsek pod obzorem, který nenarazí na terén (za okrajem mapy,
+  // dál než 60 km, obzor je z 1 500 m o 1,2° níž), míří na vzdálenou krajinu v oparu.
+  // Dřív tu byla „hladina“ jako v Alpách a v noci zrcadlila hvězdy.
   if (depth < 0.0 || (rd.y < 0.0 && depth > 900.0)) {
-    outColor = vec4(0.0);      // jezero dokreslí druhý průchod
+    outColor = vec4(farLand(rd), 1.0);
     return;
   }
   float near = depth < 900.0 ? clamp(0.35 / terrainDepth(depth).x, 0.0, 1.0) : 0.0;
@@ -926,7 +974,7 @@ void main() {
       m = materialAt(uv);
     }
     if (m.depth > 900.0 || m.depth < 0.0) {
-      c = skyWithClouds(rd, uv);
+      c = rd.y < 0.0 ? farLand(rd) : skyWithClouds(rd, uv);
     } else {
       vec2 td = terrainDepth(m.depth);
       c = litTerrain(shifted, m, rd, td.x);
@@ -974,6 +1022,7 @@ void main() {
   }
   vec4 sea = fogSea(rd, sceneDist);
   c = mix(c, sea.rgb, sea.a);
+  c += townDomes(rd, sceneDist);
   vec4 ridge = ridgeCloud(rd, sceneDist);
   c = c * (1.0 - ridge.a) + ridge.rgb * uRidge;
   // Cáry mraků na svazích (viz slopeWisp) a jejich odraz v hladině: zrcadlený paprsek
@@ -1148,6 +1197,7 @@ export async function createDisplay(gl) {
       gl.uniform1f(u.uGust, o.gust);
       gl.uniform1f(u.uMist, o.mist);
       gl.uniform1f(u.uInversion, o.inversion || 0);
+      if (o.towns) gl.uniform4fv(u.uTowns, o.towns);
       gl.uniform1f(u.uRidge, o.ridge || 0);
       if (o.ridgeShift) gl.uniform2f(u.uRidgeShift, o.ridgeShift[0], o.ridgeShift[1]);
       if (o.ridgeDir) gl.uniform2f(u.uRidgeDir, o.ridgeDir[0], o.ridgeDir[1]);

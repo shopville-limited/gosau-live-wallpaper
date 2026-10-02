@@ -488,3 +488,9 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Krkonoše: pěšiny z OpenStreetMap a turisté na cestě ke Sněžce](81-krkonose-pesiny-z-openstreetmap-a-turist.jpg)
 
+## 82. Krkonoše v noci: moře mlhy bez falešných odlesků, kupole světla nad městy pod inverzí
+
+*2026-10-02 20:23*
+
+![Krkonoše v noci: moře mlhy bez falešných odlesků, kupole světla nad městy pod inverzí](82-krkonose-v-noci-more-mlhy-bez-falesnych.jpg)
+

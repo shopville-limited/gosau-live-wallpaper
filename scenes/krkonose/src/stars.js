@@ -40,7 +40,8 @@ void main() {
   vec3 w = uEqToWorld * vec3(cos(dec) * cos(ra), cos(dec) * sin(ra), sin(dec));
   vFlux = 0.0;
   gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-  if (w.y < -0.02 || w.z < 0.05 || mag > uLimit + 0.5) return;
+  // Pod obzorem je v Krkonoších vzdálená krajina (žádná hladina), hvězdy tam nejsou.
+  if (w.y < 0.0 || w.z < 0.05 || mag > uLimit + 0.5) return;
   vec2 uv = screenOf(w);
   if (uv.x < -0.02 || uv.x > 1.02 || uv.y > 1.02 || uv.y < uHorizon - 0.02) return;
   float scale = uPixels.y / 1440.0;

@@ -105,6 +105,20 @@ const [terrain, display, boats, trees, boulders, particles, stars, summit, touri
   createTourists(gl, { map: heightMap, random: randomGenerator(seed ^ 0x3b9a71) }),
 ]);
 const birds = createBirds(gl, { config, random });
+// Města ve směru výhledu, jejichž světla v noci prosvítají mořem mlhy (zeměpisná poloha
+// převedená do souřadnic scény): x, z (km), síla světla, poloměr záře (km).
+const TOWNS = [
+  [50.735, 15.820, 0.6, 0.45],   // Malá Úpa
+  [50.793, 15.835, 1.4, 0.8],    // Kowary
+  [50.783, 16.030, 1.8, 1.3],    // Kamienna Góra
+  [50.704, 16.000, 1.0, 0.7],    // Lubawka
+];
+const towns = new Float32Array(TOWNS.flatMap(([lat, lon, power, radius]) => {
+  const { lat: lat0, lon: lon0, azimuth } = heightMap.meta.camera;
+  const az = azimuth * Math.PI / 180;
+  const east = (lon - lon0) * 111320 * Math.cos(lat0 * Math.PI / 180) / 1000, north = (lat - lat0) * 111132 / 1000;
+  return [east * Math.cos(az) - north * Math.sin(az), east * Math.sin(az) + north * Math.cos(az), power, radius];
+}));
 console.warn(`Překlad shaderů terénu: ${createTerrain.compileMs} ms`);
 console.warn('Překlad programů (ms): ' + compileTimes.map(([l, ms, how]) => `${l} ${ms} ${how}`).join(', '));
 
@@ -513,7 +527,7 @@ function render() {
     humid: Math.min(1, Math.max(state.wx.rain * 1.2, smoothstep01((state.wx.overcast - 0.45) / 0.45) * 0.7,
       current.season.autumn * Math.max(0, 1 - Math.abs(current.date.getHours() + current.date.getMinutes() / 60 - 8) / 3) * (1 - state.wx.high * 0.3)) * (current.season.ice > 0.7 ? 0.3 : 1)),
     meteor: { seed: state.meteorSeed, age: time - state.meteorAt },
-    inversion: state.wx.inversion || 0, fogTop: state.wx.fogTop || 1.1, rime: state.wx.rime || 0,
+    inversion: state.wx.inversion || 0, fogTop: state.wx.fogTop || 1.1, rime: state.wx.rime || 0, towns,
     ridge: state.wx.ridge || 0, ridgeShift: state.ridgeShift, ridgeDir: state.ridgeDir, peak: heightMap.places.snezka,
     flash: flashAt(time - state.strikeAt) * (0.5 + 0.5 * (1 - Math.max(0, current.sun[1]) * 2)),
     bolt: state.bolt, boltAlpha: flashAt(time - state.strikeAt) > 0.05 ? Math.min(1, flashAt(time - state.strikeAt) * 1.5) : 0,

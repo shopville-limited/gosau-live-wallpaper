@@ -494,3 +494,9 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Krkonoše v noci: moře mlhy bez falešných odlesků, kupole světla nad městy pod inverzí](82-krkonose-v-noci-more-mlhy-bez-falesnych.jpg)
 
+## 83. Krkonoše: lanovka na Sněžku podle OSM, jezdí v provozní době
+
+*2026-10-02 21:49*
+
+![Krkonoše: lanovka na Sněžku podle OSM, jezdí v provozní době](83-krkonose-lanovka-na-snezku-podle-osm-jez.jpg)
+

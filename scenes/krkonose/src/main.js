@@ -17,6 +17,7 @@ import { createWeather } from './weather.js';
 import { createStars } from './stars.js';
 import { createBoulders } from './boulders.js';
 import { createTourists } from './tourists.js';
+import { createLift } from './lift.js';
 import { createSummit } from './summit.js';
 import { createSnapshotCache } from './snapshot-cache.js';
 import { createParticles } from './particles.js';
@@ -93,7 +94,7 @@ try {
 }
 // Všechny shadery se překládají najednou na pozadí (grafický proces), stránka mezitím
 // odpovídá a ukazuje obrázek z minula. Synchronní překlad by ji zablokoval i na 20 s.
-const [terrain, display, boats, trees, boulders, particles, stars, summit, tourists] = await Promise.all([
+const [terrain, display, boats, trees, boulders, particles, stars, summit, tourists, lift] = await Promise.all([
   createTerrain(gl, heightMap),
   createDisplay(gl),
   createBoats(gl, { map: heightMap, random, config }),
@@ -103,6 +104,7 @@ const [terrain, display, boats, trees, boulders, particles, stars, summit, touri
   createStars(gl, { url: new URL('../assets/hvezdy.bin', import.meta.url).href }),
   createSummit(gl, { map: heightMap }),
   createTourists(gl, { map: heightMap, random: randomGenerator(seed ^ 0x3b9a71) }),
+  createLift(gl, { map: heightMap }),
 ]);
 const birds = createBirds(gl, { config, random });
 // Města ve směru výhledu, jejichž světla v noci prosvítají mořem mlhy (zeměpisná poloha
@@ -409,6 +411,21 @@ function touristShare(now) {
   return day * season * weekend * weather;
 }
 
+// Provozní doba lanovky na Sněžku (snezkalanovka.cz): denně 8–18 h, od května do září do 19 h,
+// v dubnu a listopadu jen o víkendech. Na Sněžku jezdí podle počasí: do větru 60 km/h
+// a ne za bouřky (pak kabinky visí na laně a stojí).
+function liftSchedule(now) {
+  const month = now.date.getMonth(), day = now.date.getDay();
+  const hour = now.date.getHours() + now.date.getMinutes() / 60;
+  const weekend = day === 0 || day === 6;
+  const openDay = (month !== 3 && month !== 10) || weekend;
+  const open = openDay && hour >= 8 && hour < (month >= 4 && month <= 8 ? 19 : 18);
+  const wx = state.wx || {};
+  const gusts = (wx.wind || 0) * 1.4 + (wx.gustiness || 0) * 14;
+  const running = open && gusts < 16.7 && (wx.storm || 0) < 0.3;
+  return { open, running };
+}
+
 function simulate(dt) {
   state.time += dt;
   state.nextGust -= dt;
@@ -421,6 +438,7 @@ function simulate(dt) {
   state.gust *= Math.exp(-dt / 5);
   weather.tick();
   tourists.update(dt, touristShare(current));
+  lift.update(dt, liftSchedule(current));
   const target = weatherTarget(current);
   // První skutečné údaje hned po startu platí rovnou (bez přechodu z vymyšleného počasí).
   if (!state.wx || (target.real && state.wx.real < 0.01 && state.time < 20)) state.wx = { ...target };
@@ -535,7 +553,7 @@ function render() {
     sun: current.sun, moon: current.moon, moonPhase: current.moonPhase,
     wakes: boats.wakes(),
     trees, season: current.season,
-    stars, boulders, particles, summit, tourists, date: current.date, sky: skyFrame(current.date, config.cas.sirka, config.cas.delka),
+    stars, boulders, particles, summit, tourists, lift, date: current.date, sky: skyFrame(current.date, config.cas.sirka, config.cas.delka),
     map: heightMap,
   });
   // Odrazy blízkých stromů a rákosí (vzdálenější odraz už je v obrazu vody), pak balvanů.

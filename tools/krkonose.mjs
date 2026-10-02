@@ -258,9 +258,19 @@ for (const t of trails) {
 writeFileSync(join(out, 'teren-cesty.bin'), Buffer.from(pathField.buffer));
 // Trasy pro turisty: jen pěšiny a chodníky v okolí výhledu (do 4 km), body v km scény.
 const near = trails.filter((t) => t.kind !== 'service' && t.kind !== 'unclassified' && t.points.some(([x, z]) => z > 0 && z < 4 && Math.abs(x) < 2.5));
+// Lanovka Pec pod Sněžkou – Růžová hora – Sněžka (aerialway=gondola): stanice a podpěry.
+const lifts = [];
+for (const m of osm.matchAll(/<way id="\d+"[^>]*>([\s\S]*?)<\/way>/g)) {
+  if (!/<tag k="aerialway" v="gondola"/.test(m[1])) continue;
+  const name = /<tag k="name" v="([^"]*)"/.exec(m[1])?.[1] || '';
+  const pts = [...m[1].matchAll(/<nd ref="(\d+)"/g)].map((n) => nodes.get(n[1])).filter(Boolean)
+    .map(([lat, lon]) => { const [x, z] = local(lat, lon); return [x, z]; });
+  lifts.push({ name, points: pts });
+}
 writeFileSync(join(out, 'cesty.json'), JSON.stringify({
   source: '© přispěvatelé OpenStreetMap (ODbL)',
   trails: near.map((t) => ({ kind: t.kind, points: t.points })),
+  lifts,
 }));
 console.log(`Cesty z OSM: ${trails.length} úseků, pro turisty ${near.length}`);
 

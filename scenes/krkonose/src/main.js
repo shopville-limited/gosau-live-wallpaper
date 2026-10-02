@@ -255,7 +255,8 @@ function seasonKey(season) {
 // Skutečné počasí v Gosau (config.pocasi = 'skutecne'); jen když scéna ukazuje
 // skutečný okamžik, ne pevnou hodinu, jiný měsíc nebo přehrávání dne.
 // Náhled: ?pocasi=nizka:80,stredni:90,vysoka:20,vitr:12,smer:270,naraz:20,srazky:2,snih:0,
-// teplota:10,kod:95,viditelnost:5000 nasimuluje počasí (nic se nestahuje).
+// teplota:10,kod:95,viditelnost:5000,inverze:1,vrstva:1150 nasimuluje počasí (nic se nestahuje;
+// inverze = moře mlhy pod hřebenem, vrstva = výška její horní hranice v m n. m.).
 function weatherFromUrl(text) {
   if (!text) return null;
   const v = {};
@@ -271,20 +272,36 @@ function weatherFromUrl(text) {
     rain: (v.teplota ?? 10) > 1.5 ? v.srazky ?? 0 : 0, snowfall: v.snih ?? 0, code: v.kod ?? 0,
     cover: Math.max(low, mid, high), low, mid, high, visibility: v.viditelnost ?? 30000,
     wind, direction: v.smer ?? 250, gusts: v.naraz ?? wind * 1.5,
+    inversion: Math.min(1, Math.max(0, v.inverze ?? 0)), fogTop: v.vrstva ? v.vrstva / 1000 : undefined,
   };
 }
 const weather = createWeather({
-  latitude: config.cas.sirka, longitude: config.cas.delka, enabled: config.pocasi === 'skutecne',
+  latitude: config.cas.sirka, longitude: config.cas.delka, elevation: 1510,
+  // Údolí pro rozpoznání inverze: Pec pod Sněžkou (~820 m n. m.).
+  valley: { latitude: 50.692, longitude: 15.733, elevation: 820 },
+  enabled: config.pocasi === 'skutecne',
   override: weatherFromUrl(params.get('pocasi')),
 });
 const showsNow = () => weather.simulated || (!clock.play && clock.hour === null && clock.month === null && clock.speed === 1);
+
+// Moře mlhy bez skutečných údajů: některá podzimní a zimní rána (los podle dne), za
+// dopoledne se rozpustí. Výška horní hranice vrstvy se den ode dne liší (950–1 200 m n. m.).
+function inventedInversion(now) {
+  const day = Math.floor(now.date.getTime() / 86400000);
+  const chance = 0.12 + 0.3 * Math.max(now.season.autumn, now.season.winter * 0.7);
+  if (randomGenerator(day ^ 0x1a2b3c)() > chance) return 0;
+  const hour = now.date.getHours() + now.date.getMinutes() / 60;
+  return 1 - smoothstep01((hour - 10) / 3) + 0.6 * smoothstep01((hour - 19) / 3);
+}
+const fogTopFor = (now) => 0.95 + 0.25 * randomGenerator(Math.floor(now.date.getTime() / 86400000) ^ 0x77)();
 
 function weatherTarget(now) {
   const w = showsNow() ? weather.current : null;
   if (!w) {
     const invented = Math.min(1, Math.max(0, config.mraky.pokryti + (now.season.cloudiness - 0.45)));
-    return { real: 0, low: invented, mid: 0, high: invented, wind: 3, direction: 250, gustiness: 0,
-      snow: snowWanted(now), mist: 1, overcast: 0, rain: 0, storm: 0 };
+    const inversion = Math.min(1, inventedInversion(now));
+    return { real: 0, low: invented * (1 - inversion), mid: 0, high: invented, wind: 3, direction: 250, gustiness: 0,
+      snow: snowWanted(now), mist: 1, overcast: 0, rain: 0, storm: 0, inversion, fogTop: fogTopFor(now) };
   }
   const cold = w.temperature < 1.5;
   const falling = w.snowfall > 0 || (cold && w.precipitation > 0);
@@ -297,9 +314,11 @@ function weatherTarget(now) {
   const overcast = Math.max(Math.min(1, w.mid * 0.95 + Math.max(0, w.low - 0.75) * 2.4),
     // Přeháňky (kódy 80–82): mezi mraky prosvítá slunce, souvislá vrstva je jen řídká.
     rain > 0 || falling ? (w.code >= 80 && w.code <= 82 ? 0.25 : 0.75) : 0, storm * 0.85);
+  // Při inverzi je nízká oblačnost pod námi (moře mlhy), ne na obloze.
+  const inversion = w.inversion || 0;
   return {
-    overcast, rain, storm,
-    real: 1, low: w.low, mid: w.mid, high: w.high, wind: w.wind, direction: w.direction,
+    overcast: overcast * (1 - inversion), rain, storm, inversion, fogTop: w.fogTop ?? fogTopFor(now),
+    real: 1, low: w.low * (1 - inversion), mid: w.mid, high: w.high, wind: w.wind, direction: w.direction,
     gustiness: Math.min(0.7, Math.max(0, (w.gusts - 6) / 14)),
     snow: state.time < state.snowUntil ? 1 : falling ? Math.min(1, 0.35 + w.snowfall * 0.9 + w.precipitation * 0.3) : 0,
     mist: 0.6 + 1.6 * fog + 1.2 * (1 - Math.min(1, w.visibility / 20000)) + rain * 0.8,
@@ -450,6 +469,7 @@ function render() {
     humid: Math.min(1, Math.max(state.wx.rain * 1.2, smoothstep01((state.wx.overcast - 0.45) / 0.45) * 0.7,
       current.season.autumn * Math.max(0, 1 - Math.abs(current.date.getHours() + current.date.getMinutes() / 60 - 8) / 3) * (1 - state.wx.high * 0.3)) * (current.season.ice > 0.7 ? 0.3 : 1)),
     meteor: { seed: state.meteorSeed, age: time - state.meteorAt },
+    inversion: state.wx.inversion || 0, fogTop: state.wx.fogTop || 1.1,
     flash: flashAt(time - state.strikeAt) * (0.5 + 0.5 * (1 - Math.max(0, current.sun[1]) * 2)),
     bolt: state.bolt, boltAlpha: flashAt(time - state.strikeAt) > 0.05 ? Math.min(1, flashAt(time - state.strikeAt) * 1.5) : 0,
     sun: current.sun, moon: current.moon, moonPhase: current.moonPhase,

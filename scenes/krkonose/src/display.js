@@ -44,6 +44,8 @@ uniform vec2 uCloudShift;        // posun mraků větrem
 uniform float uRipple;           // zčeření hladiny
 uniform float uGust;             // poryv větru 0..1
 uniform float uMist;
+uniform float uInversion;       // moře mlhy pod hřebenem 0..1 (inverze)
+uniform float uFogTop;          // horní hranice vrstvy (km n. m.)
 uniform float uIce;              // zamrzlé jezero 0..1
 uniform float uSnowfall;         // sněžení 0..1
 uniform float uRain;             // déšť 0..1
@@ -778,6 +780,52 @@ vec4 slopeWisp(vec3 dir, float dist) {
   return vec4(wisp, clamp(cloudy * 1.1, 0.0, 0.85));
 }
 
+// Moře mlhy (inverze): pod hřebenem souvislá vrstva oblačnosti, nahoře zvlněná do kup
+// (desítky metrů), které pomalu táhnou po větru. Hřbety nad ní vyčnívají jako ostrovy; kde se
+// terén noří, vrstva ho zahalí plynule (podle délky paprsku v mlze).
+vec4 fogSea(vec3 rd, float sceneDist) {
+  if (uInversion < 0.01 || rd.y > -0.0002) return vec4(0.0);
+  float drop = CAMERA_HEIGHT - uFogTop;
+  if (drop <= 0.0) return vec4(0.0);
+  vec3 cam = vec3(0.0, CAMERA_HEIGHT, 0.0);
+  float t = drop / -rd.y;
+  if (t > sceneDist + 0.5) return vec4(0.0);
+  vec2 q = (cam + rd * t).xz;
+  vec2 drift = uCloudShift * 0.4;
+  float big = texture(uNoise, q * 0.35 + drift).r;
+  float b = big * 0.55 + texture(uNoise, q * 1.3 + drift * 1.6 + 0.3).r * 0.3 + texture(uNoise, q * 4.2 + drift * 2.2 + 0.7).r * 0.15;
+  float top = uFogTop + 0.04 * (b - 0.5);
+  t = (CAMERA_HEIGHT - top) / -rd.y;
+  // Terén nad vrstvou: těsně nad ní ještě slabý závoj (vlhký opar), ať se hřbety z mlhy
+  // vynořují plynule a hranice není ostrá jako deska.
+  float above = cam.y + rd.y * sceneDist - top;
+  float veil = exp(-max(above, 0.0) / 0.025) * 0.55 * smoothstep(0.2, 0.8, sceneDist);
+  if (t >= sceneDist && veil < 0.01) return vec4(0.0);
+  t = min(t, sceneDist);
+  vec3 Q = cam + rd * t;
+  // Normála kup ze sklonu šumu (velká měřítka), ať mají světlou a stinnou stranu.
+  float e = 0.15;
+  float bx = texture(uNoise, (Q.xz + vec2(e, 0.0)) * 0.35 + drift).r, bz = texture(uNoise, (Q.xz + vec2(0.0, e)) * 0.35 + drift).r;
+  vec3 n = normalize(vec3(-(bx - big) / e * 0.12, 1.0, -(bz - big) / e * 0.12));
+  vec3 zenith, horizon;
+  palette(uSun.y, zenith, horizon);
+  float sunUp = smoothstep(-0.02, 0.06, uSun.y);
+  float lambert = max(dot(n, uSun), 0.0) * 0.6 + 0.4 * max(uSun.y, 0.0);
+  vec3 sky = mix(horizon, zenith, 0.6) * (0.85 + 0.15 * n.y);
+  // Vrcholy kup světlé, prohlubně mezi nimi modravé ve stínu.
+  float crest = smoothstep(0.3, 0.75, b);
+  vec3 col = 0.82 * (sunLight() * lambert * sunUp * mix(0.75, 1.1, crest) + sky * mix(0.7, 1.0, crest) + moonLight() * 0.8);
+  // Proti slunci se okraje kup prosvítí (dopředný rozptyl).
+  col += sunLight() * 0.25 * pow(max(dot(rd, uSun), 0.0), 8.0) * (1.0 - crest) * sunUp;
+  // Vzduch mezi okem a vrstvou (jako u terénu).
+  vec3 transmit = exp(-vec3(0.020, 0.028, 0.042) * t * exp(-max(Q.y, 0.0) * 0.55));
+  col = col * transmit + skyColor(normalize(vec3(rd.x, 0.05, rd.z))) * 0.95 * (1.0 - transmit);
+  // Kolik mlhy paprsek projde, než narazí na terén (ostrovy hřbetů mají měkký okraj).
+  float inside = min(sceneDist, 60.0) - t;
+  float alpha = max(1.0 - exp(-inside * 30.0), veil) * uInversion;
+  return vec4(col, clamp(alpha, 0.0, 1.0));
+}
+
 vec3 aces(vec3 x) {
   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
 }
@@ -856,6 +904,8 @@ void main() {
     float depthFade = 1.0 - exp(-max(sceneDist - 0.15, 0.0) * 0.9);
     c = mix(c, fogColor, clamp(layer * wisps * fogAmount * depthFade * 0.7, 0.0, 0.8));
   }
+  vec4 sea = fogSea(rd, sceneDist);
+  c = mix(c, sea.rgb, sea.a);
   // Cáry mraků na svazích (viz slopeWisp) a jejich odraz v hladině: zrcadlený paprsek
   // najde na obrazovce bod svahu, který se v daném místě vody zrcadlí.
   if (uHumid > 0.01) {
@@ -1026,6 +1076,8 @@ export async function createDisplay(gl) {
       gl.uniform1f(u.uRipple, o.ripple);
       gl.uniform1f(u.uGust, o.gust);
       gl.uniform1f(u.uMist, o.mist);
+      gl.uniform1f(u.uInversion, o.inversion || 0);
+      gl.uniform1f(u.uFogTop, o.fogTop || 1.1);
       gl.uniform1f(u.uIce, o.ice);
       gl.uniform1f(u.uSnowfall, o.snowfall);
       gl.uniform1f(u.uRain, o.rain || 0);

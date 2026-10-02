@@ -450,7 +450,7 @@ Surface surfaceAt(vec3 p, float t) {
   // Tundra je souvislá; holá místa jen ve strmých stěnách a balvanová pole na Sněžce.
   grassy *= 1.0 - 0.75 * smoothstep(1.53, 1.6, alt) * smoothstep(0.45, 0.7, noise3(wp * 0.02 + 5.0) * 0.5 + 0.5);
   vec3 alpine = mix(vec3(0.050, 0.060, 0.030), vec3(0.075, 0.072, 0.040), smoothstep(1.35, 1.55, alt));   // smilka, metlička: olivová, výš do žluta
-  alpine = mix(alpine, vec3(0.13, 0.09, 0.045), uAutumn * 0.7);
+  alpine = mix(alpine, vec3(0.105, 0.088, 0.05), uAutumn * 0.6);   // podzimní tundra: slámově okrová, ne oranžová
   alpine *= (0.85 + 0.3 * fine) * textureDetail(uGrassColor, uGrassMean, wp * 3.0, triW, footprint * 3.0);
   // Horská tráva není trávník: vlhčí a sušší plochy, keře a kleč, trsy suché trávy.
   alpine *= mix(0.7, 1.05, noise3(wp * 0.04 + 53.0) * 0.5 + 0.5);

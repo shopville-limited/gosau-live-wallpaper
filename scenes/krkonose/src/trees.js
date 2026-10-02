@@ -179,7 +179,7 @@ void main() {
     if (best > 0.0 && !flower) discard;
     width = 1.0;
     vec3 grass = mix(vec3(0.06, 0.075, 0.03), vec3(0.11, 0.105, 0.045), fract(vSeed * 5.1));   // olivová až slámová
-    grass = mix(grass, vec3(0.13, 0.11, 0.05), uAutumn * 0.8);
+    grass = mix(grass, vec3(0.115, 0.1, 0.055), uAutumn * 0.65);
     color = grass * (0.7 + 0.5 * y);
     lit = 0.45 + 0.55 * y;
     if (flower) {

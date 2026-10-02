@@ -464,3 +464,9 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Krkonoše v zimě: zasněžené balvany a kleč, vyfoukané hřbety](77-krkonose-v-zime-zasnezene-balvany-a-klec.jpg)
 
+## 78. Krkonoše: moře mlhy při inverzi (podzimní ráno), Sněžka nad oblačností
+
+*2026-10-02 18:09*
+
+![Krkonoše: moře mlhy při inverzi (podzimní ráno), Sněžka nad oblačností](78-krkonose-more-mlhy-pri-inverzi-podzimni.jpg)
+

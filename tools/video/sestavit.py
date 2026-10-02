@@ -14,15 +14,17 @@ FADE = 0.4
 # záběr, od které sekundy nahrávky, délka (s)
 CLIPS = [
     ('01-uvod', 0.5, 3.0),
-    ('02-den', 0.3, 3.0),
-    ('03-jaro', 0.5, 3.0),
-    ('04-podzim', 0.5, 3.0),
-    ('05-zima', 0.5, 3.2),
-    ('06-bourka', 0.2, 3.0),     # blesk v 0,5–1,2 s nahrávky
-    ('07-duha', 0.5, 2.8),
-    ('08-soumrak', 0.5, 3.0),
-    ('09-noc', 0.0, 3.0),        # padající hvězda hned na začátku
-    ('10-zaver', 0.3, 3.6),      # hejno ptáků
+    ('02-den', 0.3, 2.4),
+    ('04-podzim', 0.5, 2.4),
+    ('05-zima', 0.5, 2.4),
+    ('06-bourka', 0.2, 2.4),     # blesk v 0,5–1,2 s nahrávky
+    ('09-noc', 0.0, 2.4),        # padající hvězda hned na začátku
+    ('11-k-den', 0.5, 2.8),      # Krkonoše: lanovka a turisté
+    ('12-k-inverze', 0.5, 2.6),
+    ('13-k-cepice', 0.5, 2.4),
+    ('14-k-zima', 0.5, 2.4),
+    ('15-k-noc', 0.5, 2.4),
+    ('10-zaver', 0.3, 3.2),      # hejno ptáků
 ]
 
 # Začátky záběrů ve výsledném videu.
@@ -36,17 +38,19 @@ TOTAL = t + FADE
 # Popisky: od, do, velký text, malý text (v sekundách výsledného videa).
 S = starts
 TEXTS = [
-    (0.3, S[1] + 0.1, 'Živá tapeta pro Windows', 'Gosausee a Dachstein · skutečný terén Rakouských Alp'),
-    (S[1] + 0.3, S[2] + 0.1, 'Den podle skutečného času', 'slunce a stíny hor počítané pro polohu Gosau'),
-    (S[2] + 0.3, S[3] + 0.1, 'Roční období podle kalendáře', 'jaro: kvetoucí stromy, loďky, labutě a kachny'),
-    (S[3] + 0.3, S[4] + 0.1, 'Roční období podle kalendáře', 'podzim: zlaté modříny, padající listí, mraky v lesích'),
-    (S[4] + 0.3, S[5] + 0.1, 'Roční období podle kalendáře', 'zima: zamrzlé jezero, bruslaři, sněžení do hloubky'),
-    (S[5] + 0.3, S[7] + 0.1, 'Skutečné počasí v Gosau', 'déšť, bouřka i duha podle dat Open-Meteo'),
-    (S[7] + 0.3, S[8] + 0.1, 'Soumrak a noc', 'mlha nad jezerem, lucerna na loďce, okno chaty'),
-    (S[8] + 0.3, S[9] + 0.1, 'Skutečná noční obloha', '5 080 hvězd z katalogu, Mléčná dráha, padající hvězdy'),
-    (S[9] + 0.3, TOTAL - 0.05, 'Moje tapeta', 'pod ikonami plochy · při hře se sama zastaví'),
+    (0.3, S[1] + 0.1, 'Živá tapeta pro Windows', 'dvě scény ze skutečného terénu: Alpy a Krkonoše'),
+    (S[1] + 0.3, S[2] + 0.1, 'Den podle skutečného času', 'Gosausee a Dachstein · slunce a stíny pro polohu Gosau'),
+    (S[2] + 0.3, S[4] + 0.1, 'Roční období podle kalendáře', 'podzimní listí, zamrzlé jezero, sněžení do hloubky'),
+    (S[4] + 0.3, S[5] + 0.1, 'Skutečné počasí', 'déšť a bouřka podle aktuálních dat Open-Meteo'),
+    (S[5] + 0.3, S[6] + 0.1, 'Skutečná noční obloha', '5 080 hvězd z katalogu, Mléčná dráha, padající hvězdy'),
+    (S[6] + 0.3, S[7] + 0.1, 'Nově: Krkonoše – Sněžka', 'terén ČÚZK, cesty, turisté a lanovka podle OpenStreetMap'),
+    (S[7] + 0.3, S[8] + 0.1, 'Moře mlhy při inverzi', 'poznané ze skutečného počasí na hřebeni a v údolí'),
+    (S[8] + 0.3, S[9] + 0.1, 'Mrak přes hřeben', 'čepice na Sněžce letí se skutečným větrem'),
+    (S[9] + 0.3, S[10] + 0.1, 'Zima na hřebeni', 'sníh, vyfoukané hřbety a námraza'),
+    (S[10] + 0.3, S[11] + 0.1, 'Noc nad inverzí', 'kupole světla měst pod mořem mlhy'),
+    (S[11] + 0.3, TOTAL - 0.05, 'Moje tapeta', 'pod ikonami plochy · při hře se sama zastaví'),
 ]
-CREDIT = (S[9] + 0.8, TOTAL - 0.05, 'Made with Claude – model Opus 5.5')
+CREDIT = (S[11] + 0.8, TOTAL - 0.05, 'Made with Claude – model Opus 5.5')
 
 FONT_BOLD = 'C\\:/Windows/Fonts/segoeuib.ttf'
 FONT = 'C\\:/Windows/Fonts/segoeui.ttf'

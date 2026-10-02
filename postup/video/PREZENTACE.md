@@ -1,6 +1,6 @@
-# Moje tapeta: živé Rakouské Alpy na ploše Windows
+# Moje tapeta: živé Rakouské Alpy a Krkonoše na ploše Windows
 
-Plocha počítače, která žije. Místo statického obrázku se pod ikonami rozprostírá horské jezero Gosausee s masivem Dachsteinu a jeho ledovcem, a krajina se mění přesně tak, jako se v tu chvíli mění v Alpách: s hodinami, s ročním obdobím, se skutečným počasím i s noční oblohou. Žádné video ve smyčce a žádné předpřipravené obrázky. Každý snímek se v reálném čase počítá na grafické kartě.
+Plocha počítače, která žije. Místo statického obrázku se pod ikonami rozprostírá horské jezero Gosausee s masivem Dachsteinu a jeho ledovcem, nebo nově výhled ze Studniční hory přes Úpskou jámu na Sněžku. Krajina se mění přesně tak, jako se v tu chvíli mění na skutečném místě: s hodinami, s ročním obdobím, se skutečným počasím i s noční oblohou. Žádné video ve smyčce a žádné předpřipravené obrázky. Každý snímek se v reálném čase počítá na grafické kartě.
 
 ## Skutečné místo, skutečná data
 
@@ -35,10 +35,17 @@ Plocha počítače, která žije. Místo statického obrázku se pod ikonami roz
 - **Noc:** třpytivé hvězdy, padající hvězdy, okno horské chaty, které večer svítí a před svítáním se zase rozsvítí.
 - **Balvany v popředí:** skutečné 3D tvary obroušené ledovcem, s mechem, mokrým pásem u vody a sněhovou čepicí v zimě.
 
+## Nově: Krkonoše – Sněžka
+
+- **Skutečný terén z ČÚZK.** Česká strana z digitálního modelu reliéfu DMR 5G (po 5 m kolem výhledu), polská strana z výškových dlaždic. Kamera stojí na Studniční hoře 35 m za hranou Úpské jámy, v 1 507 m n. m.
+- **Popředí:** horská tráva s kvítím, žulové balvany s lišejníky a kleč na hraně jámy; na vrcholu Sněžky polská observatoř, kaple sv. Vavřince a poštovna, v sedle Slezský dům.
+- **Cesty, turisté a lanovka podle OpenStreetMap.** Kamenné chodníky leží tam, kde skutečně vedou; turisté po nich chodí podle denní doby, sezóny, počasí a dne v týdnu, za svítání a soumraku s čelovkami. Lanovka z Růžové hory na Sněžku má podpěry na skutečných místech a jezdí v provozní době, při silném větru stojí.
+- **Krkonošské počasí:** moře mlhy při inverzi (rozpoznané srovnáním počasí na hřebeni a v Peci pod Sněžkou), námraza za mrazu a vlhka, mrak na Sněžce, který letí skutečnou rychlostí větru, a v noci kupole světla měst pod inverzí.
+
 ## Ohleduplná k počítači
 
 - **Hry mají přednost:** když běží hra přes celou obrazovku, tapeta se na všech monitorech zastaví a po skončení hry se sama rozběhne.
-- **Šetří výkon:** běží na 30 snímků za sekundu, velké monitory kreslí nejvýš ve 2,5 milionu pixelů a za běžného provozu bere zhruba desetinu výkonu grafické karty.
+- **Šetří výkon:** velké monitory kreslí nejvýš ve 2,5 milionu pixelů. Plných 30 snímků za sekundu jen tehdy, když se děje něco rychlého (blízcí ptáci, kurzor, déšť, blesky); jinak 15. Na monitoru 3 440 × 1 440 tak bere zhruba desetinu výkonu karty RTX 5060 Ti (změřeno).
 - **Stojí, když není vidět:** zakrytý monitor, zamčený počítač, vypnutá obrazovka nebo úsporný režim ji zastaví. Na baterii zpomalí.
 - **Nepřekáží:** sedí pod ikonami plochy, které dál fungují jako obvykle, a každý monitor má svou vlastní scénu.
 - **Okamžitý start:** po spuštění hned ukáže poslední hotový snímek a plynule přejde do živé scény.
@@ -52,7 +59,7 @@ Plocha počítače, která žije. Místo statického obrázku se pod ikonami roz
   - objemové mraky, odrazy ve vodě počítané paprskem v prostoru obrazovky,
   - 3D modely loděk, zvířat a balvanů ze vzdálenostních funkcí,
   - tisíce instancí vegetace, filmová úprava barev a zrno.
-- **Kvalita:** samotest běží ve stejném prostředí jako tapeta, ve dne i za soumraku, a průběh vývoje dokumentuje přes 70 snímků v galerii.
+- **Kvalita:** samotest běží ve stejném prostředí jako tapeta, ve dne i za soumraku, a průběh vývoje dokumentuje přes 80 snímků v galerii.
 
 ---
 
@@ -60,4 +67,4 @@ Plocha počítače, která žije. Místo statického obrázku se pod ikonami roz
 
 ### Zdroje dat a licence
 
-Terén: DGM Österreich © data.gv.at / geoland.at (CC BY 4.0), přes Mapzen Terrain Tiles · Počasí: Open-Meteo (CC BY 4.0) · Hvězdy: Yale Bright Star Catalogue, 5. vydání (volné dílo) · Dráhy planet: JPL, E. M. Standish · Textury: ambientCG (CC0) · Smyčka snímků: projekt Deskworlds (MIT).
+Terén Alp: DGM Österreich © data.gv.at / geoland.at (CC BY 4.0), přes Mapzen Terrain Tiles · Terén Krkonoš: © ČÚZK, DMR 5G (CC BY 4.0) · Cesty a lanovka: © přispěvatelé OpenStreetMap (ODbL) · Počasí: Open-Meteo (CC BY 4.0) · Hvězdy: Yale Bright Star Catalogue, 5. vydání (volné dílo) · Dráhy planet: JPL, E. M. Standish · Textury: ambientCG (CC0) · Smyčka snímků: projekt Deskworlds (MIT).

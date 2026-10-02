@@ -503,7 +503,7 @@ function busyNow() {
   return birds.flocks.some((f) => f.kind === 'blizko' || f.kind === 'sova') || performance.now() - (state.pointerAt || -1e9) < 3000
     || state.doneAt === null || state.time - state.doneAt < 3
     || (state.wx && state.wx.rain > 0.05) || state.snowfall > 0.05 || state.time < state.snowUntil
-    || state.time - state.strikeAt < 3 || state.time - state.meteorAt < 3 || Boolean(clock.play) || (current.season.ice > 0.7 && current.sun[1] > 0);
+    || state.time - state.strikeAt < 3 || state.time - state.meteorAt < 3 || Boolean(clock.play) || params.has('nahravat') || (current.season.ice > 0.7 && current.sun[1] > 0);
 }
 
 function frame(dt) {

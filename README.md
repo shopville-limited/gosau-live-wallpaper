@@ -1,4 +1,4 @@
-# Moje tapeta: živé Rakouské Alpy na ploše Windows
+# Moje tapeta: živé Rakouské Alpy a Krkonoše na ploše Windows
 
 ![Gosausee a Dachstein za svítání](postup/58-svitani-prizemni-mlha-nad-jezerem-okno-c.jpg)
 
@@ -14,7 +14,7 @@ Horské jezero Gosausee s Dachsteinem ze skutečných výškových dat Rakouska.
 
 Živá tapeta pro Windows 10 a 11. Na každý monitor položí pod ikony plochy okno s WebView2 a posílá do něj polohu kurzoru. Ikony, klikání i výběr na ploše fungují dál jako obvykle.
 
-Obsahuje scénu **Rakouské Alpy**: horské jezero Gosausee pod vápencovým masivem Dachsteinu s ledovcem, se skutečným časem, ročním obdobím a počasím.
+Obsahuje dvě scény, mezi kterými se přepíná v menu: **Rakouské Alpy** (horské jezero Gosausee pod vápencovým masivem Dachsteinu s ledovcem) a **Krkonoše – Sněžka** (výhled ze Studniční hory přes Úpskou jámu na Sněžku). Obě se skutečným časem, ročním obdobím a počasím.
 
 ### Rakouské Alpy
 
@@ -49,6 +49,20 @@ Obsahuje scénu **Rakouské Alpy**: horské jezero Gosausee pod vápencovým mas
   - **Poryv větru** zčeří jezero tmavými „kočičími tlapkami“ a rozžene mraky.
   - **Přehrát den** ukáže celý den od půlnoci do půlnoci za dvě minuty a pak se vrátí ke skutečnému času.
   - **Sněžení** spustí na minutu a půl sněžení.
+
+### Krkonoše – Sněžka
+
+Scéna má stejný základ jako Alpy (slunce, noční obloha, roční období, počasí z Open-Meteo, ptáci, sníh, déšť a bouřky), k tomu krkonošské věci:
+
+- **Skutečný terén**: Česká strana z digitálního modelu reliéfu ČÚZK DMR 5G (po 5 m kolem výhledu, po 50 m do dálky), polská strana a dálka z dlaždic terrarium. Kamera stojí na plošině Studniční hory 35 m za hranou Úpské jámy (1 507 m n. m.) a dívá se přes jámu na Sněžku (2,15 km).
+- **Popředí**: hustá horská tráva (smilka, metlička) s kvítím jestřábníků a zvonků, žulové balvany s lišejníky (3D tvary) a skupinky kleče na hraně jámy. Tundra je souvislá, skála vystupuje jen ve skalních výchozech; kleč roste v ostrůvcích podle masky nad skutečným terénem, les jen v dolní části jámy.
+- **Sněžka**: polská observatoř se třemi „talíři“, kaple sv. Vavřince a Česká poštovna jako malé 3D modely; v noci svítí okna, v zimě je pokryje námraza.
+- **Pěšiny z OpenStreetMap**: kamenné chodníky a udusané cesty jsou do terénu vykreslené podle skutečných tras (cesta po hřebeni na Sněžku, traverz jámou), s pásem prošlapané trávy.
+- **Turisté**: drobné postavy (ve skutečném měřítku jen pár pixelů, barevné bundy) chodí po těch trasách, které kamera opravdu vidí, do kopce pomaleji, občas zastaví na výhled. Nejvíc jich je v létě o víkendu kolem poledne, za deště a v mracích málo, v noci nikdo.
+- **Moře mlhy (inverze)**: tapeta porovná počasí na hřebeni a v Peci pod Sněžkou (jedním dotazem na Open-Meteo); když je nahoře tepleji, než odpovídá výšce, a v údolí je mlha nebo nízká oblačnost, zaplní jámu i údolí oblačnost a Sněžka z ní vystupuje. Bez skutečných dat některá podzimní a zimní rána.
+- **Námraza**: za mrazu a vlhka zešedne tundra jinovatkou, stébla a kleč mají ojíněné špičky, balvany krustu.
+- **Mrak přes hřeben**: při silném větru a nízké oblačnosti sedí na Sněžce čepice mraku a za vrcholem z ní odchází vlajka; letí skutečnou rychlostí a směrem větru, takže se před očima trhá a znovu tvoří.
+- **Náhled počasí**: k parametrům z Alp přibyly `inverze:1`, `vrstva:1150` (horní hranice mlhy v m n. m.) a `namraza:1`, třeba `?pocasi=nizka:0,inverze:1,vrstva:1200&hodina=8.5&mesic=10`.
 
 Každý monitor má vlastní krajinu nebo oblohu. Obě scény jsou čisté WebGL2 bez knihoven. Všechno běží lokálně a nepotřebuje účet ani internet (výjimkou je první sestavení, viz níže).
 
@@ -261,6 +275,8 @@ host\snimek-postupu.cmd "Krátký popis verze"
 
 Scéna Alpy používá skutečný terén. Připravuje ho skript `node tools/terrain.mjs`: stáhne výškové dlaždice kolem Gosausee a uloží výškovou mapu (po 25 m), jemnou mapu okolí jezera (po 5 m) a mapu lesa do `scenes/alpy/assets/`. Výsledek je součástí projektu, takže skript stačí spustit jen při změně výřezu nebo pravidel pro les. Dlaždice se ukládají do mezipaměti `tools/.cache`.
 
+Scénu Krkonoše připravuje `node tools/krkonose.mjs`: stáhne ČÚZK DMR 5G (přes mapovou službu ags.cuzk.cz), dlaždice terrarium pro polskou stranu a cesty z OpenStreetMap (OSM API) a uloží výškové mapy, masku lesa a kleče, pole vzdáleností k cestám a trasy pro turisty do `scenes/krkonose/assets/`.
+
 ## Licence a původ
 
 MIT. Projekt vychází z [Deskworlds](https://github.com/chaseleantj/deskworlds) od Chase Leana (MIT): `serve.mjs` a `scenes/shared/frame-loop.js` jsou převzaté, nativní část je přepis macOS agenta `Wallpaper.swift` do C# pro Windows. Podrobnosti najdete v souboru [LICENSE](LICENSE).
@@ -270,5 +286,9 @@ Textury skal a země: ambientCG (https://ambientcg.com), Rock026, Rock063, Grass
 Počasí: Open-Meteo (https://open-meteo.com), data licence CC BY 4.0.
 
 Hvězdy: Yale Bright Star Catalogue, 5. vydání (D. Hoffleit, W. H. Warren, volné dílo), převod do JSON https://github.com/brettonw/YaleBrightStarCatalog; do `scenes/alpy/assets/hvezdy.bin` ho převádí `tools/stars.mjs`. Dráhy planet: E. M. Standish, Keplerian Elements for Approximate Positions of the Major Planets (JPL).
+
+Terén Krkonoš: © ČÚZK, Digitální model reliéfu České republiky 5. generace (DMR 5G), licence CC BY 4.0; polská strana Mapzen Terrain Tiles (AWS Open Data).
+
+Cesty a trasy turistů v Krkonoších: © přispěvatelé OpenStreetMap, licence ODbL 1.0 (https://www.openstreetmap.org/copyright).
 
 Terén Alp: Mapzen Terrain Tiles (AWS Open Data); pro Rakousko z digitálního modelu terénu DGM Österreich 10 m © data.gv.at / geoland.at, licence CC BY 4.0.

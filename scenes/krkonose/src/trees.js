@@ -550,7 +550,7 @@ export async function createTrees(gl, { map, random }) {
         if (random() > Math.max(density, cling)) {
           // Nad hranicí lesa (od ~1600 m n. m., 650 m nad jezerem níž už jen na
           // mírnějších místech) kleč: husté nízké keře kosodřeviny ve skupinách.
-          if (ground > 1.25 && random() < 0.6 * smooth(0.45, 0.7, vnoise(px * 50 + 31, pz * 50 + 7))) {
+          if (ground > 1.25 && map.samplePath(px, pz) > 1.5 && random() < 0.6 * smooth(0.45, 0.7, vnoise(px * 50 + 31, pz * 50 + 7))) {
             // Kleč je nízká (1–1,5 m) a široká; dál od kamery trochu větší shluky.
             const size = (0.0009 + random() * 0.0007) * (1 + Math.min(1, pz * 2));
             list.push([px, ground - 0.0003, pz, size, size * (2.0 + random()), 0.217 + random() * 0.05, 3, 0]);
@@ -610,6 +610,7 @@ export async function createTrees(gl, { map, random }) {
       for (let x = -halfWidth * z - 0.005; x < halfWidth * z + 0.005; x += 0.0025) {
         const px = x + (random() - 0.5) * 0.0025, pz = z + (random() - 0.5) * 0.0025;
         const side = Math.max(0.18, smooth(0.15, 0.45, Math.abs(px / pz)));
+        if (map.samplePath(px, pz) < 1.5) continue;
         if (random() > 0.75 * side * smooth(0.35, 0.6, vnoise(px * 70 + 3, pz * 70 + 11))) continue;
         const ground = map.sampleFine(px, pz);
         const size = 0.0006 + random() * 0.0005;
@@ -640,6 +641,7 @@ export async function createTrees(gl, { map, random }) {
         const ground = map.sampleFine(px, pz);
         if (ground < 0.0038) continue;                          // pláž a voda
         if (map.sampleForest(px, pz) > 0.6) continue;            // hustý les
+        if (map.samplePath(px, pz) < 0.3) continue;              // na cestě nic neroste
         const e = 0.003;
         const gx = (map.sampleFine(px + e, pz) - map.sampleFine(px - e, pz)) / (2 * e);
         const gz = (map.sampleFine(px, pz + e) - map.sampleFine(px, pz - e)) / (2 * e);

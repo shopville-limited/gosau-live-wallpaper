@@ -1,7 +1,8 @@
 // Terén scény Krkonoše: výhled ze Studniční hory (okraj Úpské jámy) na Sněžku.
 // Česká část z ČÚZK DMR 5G (CC BY 4.0, přes mapovou službu ags.cuzk.cz), polská část
 // a dálka z dlaždic terrarium (Mapzen, AWS Open Data). Výstup ve formátu scény:
-//   scenes/krkonose/assets/teren.json, teren.bin (50 m), teren-detail.bin (5 m), teren-les.bin
+//   scenes/krkonose/assets/teren.json, teren.bin (50 m), teren-detail.bin (5 m), teren-les.bin,
+//   teren-cesty.bin a cesty.json (pěšiny z OpenStreetMap, © přispěvatelé OSM, ODbL)
 // Výšky jsou v metrech nad mořem (base 0, „hladina“ 0): ve výhledu není žádná voda.
 //
 // Použití: node tools/krkonose.mjs
@@ -210,6 +211,59 @@ const local = (lat, lon) => {
   const east = (lon - CAMERA.lon) * mLon(CAMERA.lat), north = (lat - CAMERA.lat) * M_LAT;
   return [+((east * right.east + north * right.north) / 1000).toFixed(4), +((east * dir.east + north * dir.north) / 1000).toFixed(4)];
 };
+// ---- Cesty z OpenStreetMap (ODbL): pěšiny, chodníky, lesní cesty a schody kolem Sněžky ----
+// Stažené jednou přes OSM API (map?bbox=15.685,50.712,15.765,50.752) do tools/.cache.
+const osmFile = join(cache, 'osm-snezka.xml');
+if (!existsSync(osmFile)) {
+  console.log('Stahuji cesty z OpenStreetMap…');
+  const r = await fetch('https://api.openstreetmap.org/api/0.6/map?bbox=15.685,50.712,15.765,50.752',
+    { headers: { 'User-Agent': 'moje-tapeta-krkonose/1.0' } });
+  writeFileSync(osmFile, await r.text());
+}
+const osm = readFileSync(osmFile, 'utf8');
+const nodes = new Map();
+for (const m of osm.matchAll(/<node id="(\d+)"[^>]*?lat="([-\d.]+)" lon="([-\d.]+)"/g)) nodes.set(m[1], [+m[2], +m[3]]);
+// Šířka (m) podle druhu cesty; silnice k Luční boudě jen jako široká cesta (bez aut).
+const WIDTH = { path: 1.6, footway: 2.4, steps: 2.0, track: 3.2, service: 3.5, unclassified: 4.0, bridleway: 2.5 };
+const trails = [];
+for (const m of osm.matchAll(/<way id="\d+"[^>]*>([\s\S]*?)<\/way>/g)) {
+  const kind = /<tag k="highway" v="([a-z_]+)"/.exec(m[1])?.[1];
+  if (!kind || !(kind in WIDTH)) continue;
+  const pts = [...m[1].matchAll(/<nd ref="(\d+)"/g)].map((n) => nodes.get(n[1])).filter(Boolean)
+    .map(([lat, lon]) => local(lat, lon));
+  if (pts.length >= 2) trails.push({ kind, width: WIDTH[kind], points: pts });
+}
+// Vzdálenostní pole v jemné mřížce (5 m): vzdálenost k nejbližší cestě (dm, do 25,5 m) a polovina
+// její šířky (dm). Shader z bilineárně čtené vzdálenosti udělá ostrý okraj i v detailu.
+const pathField = new Uint8Array(fine.cols * fine.rows * 2);
+for (let i = 0; i < fine.cols * fine.rows; i++) { pathField[i * 2] = 255; pathField[i * 2 + 1] = 0; }
+const best = new Float32Array(fine.cols * fine.rows).fill(25.5);
+for (const t of trails) {
+  for (let k = 0; k + 1 < t.points.length; k++) {
+    const [ax, az] = t.points[k].map((v) => v * 1000), [bx, bz] = t.points[k + 1].map((v) => v * 1000);
+    const c0 = Math.max(0, Math.floor((Math.min(ax, bx) - 26 - FINE.left) / FINE.spacing));
+    const c1 = Math.min(fine.cols - 1, Math.ceil((Math.max(ax, bx) + 26 - FINE.left) / FINE.spacing));
+    const r0 = Math.max(0, Math.floor((Math.min(az, bz) - 26 - FINE.near) / FINE.spacing));
+    const r1 = Math.min(fine.rows - 1, Math.ceil((Math.max(az, bz) + 26 - FINE.near) / FINE.spacing));
+    const dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz || 1;
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+      const px = FINE.left + c * FINE.spacing, pz = FINE.near + r * FINE.spacing;
+      const u = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2));
+      const d = Math.hypot(px - ax - dx * u, pz - az - dz * u);
+      const i = r * fine.cols + c;
+      if (d < best[i]) { best[i] = d; pathField[i * 2] = Math.round(d * 10); pathField[i * 2 + 1] = Math.round(t.width * 5); }
+    }
+  }
+}
+writeFileSync(join(out, 'teren-cesty.bin'), Buffer.from(pathField.buffer));
+// Trasy pro turisty: jen pěšiny a chodníky v okolí výhledu (do 4 km), body v km scény.
+const near = trails.filter((t) => t.kind !== 'service' && t.kind !== 'unclassified' && t.points.some(([x, z]) => z > 0 && z < 4 && Math.abs(x) < 2.5));
+writeFileSync(join(out, 'cesty.json'), JSON.stringify({
+  source: '© přispěvatelé OpenStreetMap (ODbL)',
+  trails: near.map((t) => ({ kind: t.kind, points: t.points })),
+}));
+console.log(`Cesty z OSM: ${trails.length} úseků, pro turisty ${near.length}`);
+
 writeFileSync(join(out, 'teren.bin'), Buffer.from(toU16(main.grid).buffer));
 writeFileSync(join(out, 'teren-detail.bin'), Buffer.from(toU16(fine.grid).buffer));
 writeFileSync(join(out, 'teren-les.bin'), Buffer.from(forest.buffer));

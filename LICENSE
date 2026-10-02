@@ -42,3 +42,11 @@ Skutečné počasí ve scéně Alpy stahuje za běhu z Open-Meteo (https://open-
 data pod licencí CC BY 4.0.
 
 Textury skal (scenes/alpy/assets/textury) jsou z ambientCG (Rock026, Rock063, Grass004, Ground037, Gravel041), licence CC0 1.0.
+
+Výšková data scény Krkonoše (scenes/krkonose/assets/teren*.bin): © ČÚZK, Digitální model
+reliéfu České republiky 5. generace (DMR 5G), CC BY 4.0; polská strana Mapzen Terrain Tiles
+(AWS Open Data).
+
+Cesty a trasy turistů scény Krkonoše (scenes/krkonose/assets/teren-cesty.bin, cesty.json):
+© přispěvatelé OpenStreetMap, Open Database License (ODbL) 1.0,
+https://www.openstreetmap.org/copyright.

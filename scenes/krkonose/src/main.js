@@ -16,6 +16,7 @@ import { createTrees } from './trees.js';
 import { createWeather } from './weather.js';
 import { createStars } from './stars.js';
 import { createBoulders } from './boulders.js';
+import { createTourists } from './tourists.js';
 import { createSummit } from './summit.js';
 import { createSnapshotCache } from './snapshot-cache.js';
 import { createParticles } from './particles.js';
@@ -92,7 +93,7 @@ try {
 }
 // Všechny shadery se překládají najednou na pozadí (grafický proces), stránka mezitím
 // odpovídá a ukazuje obrázek z minula. Synchronní překlad by ji zablokoval i na 20 s.
-const [terrain, display, boats, trees, boulders, particles, stars, summit] = await Promise.all([
+const [terrain, display, boats, trees, boulders, particles, stars, summit, tourists] = await Promise.all([
   createTerrain(gl, heightMap),
   createDisplay(gl),
   createBoats(gl, { map: heightMap, random, config }),
@@ -101,6 +102,7 @@ const [terrain, display, boats, trees, boulders, particles, stars, summit] = awa
   createParticles(gl, { random }),
   createStars(gl, { url: new URL('../assets/hvezdy.bin', import.meta.url).href }),
   createSummit(gl, { map: heightMap }),
+  createTourists(gl, { map: heightMap, random: randomGenerator(seed ^ 0x3b9a71) }),
 ]);
 const birds = createBirds(gl, { config, random });
 console.warn(`Překlad shaderů terénu: ${createTerrain.compileMs} ms`);
@@ -379,6 +381,19 @@ function snowWanted(now) {
 
 let current = null;
 
+// Kolik turistů je na hřebeni (0..1): ve dne mezi osmou a šestou, nejvíc v létě a o víkendu,
+// za deště, bouřky a v mracích málo; v noci nikdo.
+function touristShare(now) {
+  const hour = now.date.getHours() + now.date.getMinutes() / 60;
+  const day = smoothstep01((hour - 7.5) / 1.5) * (1 - smoothstep01((hour - 17.5) / 2)) * smoothstep01((now.sun[1] + 0.02) / 0.1);
+  const month = now.date.getMonth();
+  const season = [0.35, 0.4, 0.35, 0.3, 0.6, 0.9, 1, 1, 0.9, 0.65, 0.15, 0.3][month];
+  const weekend = [0, 6].includes(now.date.getDay()) ? 1 : 0.55;
+  const wx = state.wx || {};
+  const weather = (1 - Math.min(1, (wx.rain || 0) * 0.85)) * (1 - (wx.storm || 0)) * (1 - (wx.ridge || 0) * 0.4);
+  return day * season * weekend * weather;
+}
+
 function simulate(dt) {
   state.time += dt;
   state.nextGust -= dt;
@@ -390,6 +405,7 @@ function simulate(dt) {
   }
   state.gust *= Math.exp(-dt / 5);
   weather.tick();
+  tourists.update(dt, touristShare(current));
   const target = weatherTarget(current);
   // První skutečné údaje hned po startu platí rovnou (bez přechodu z vymyšleného počasí).
   if (!state.wx || (target.real && state.wx.real < 0.01 && state.time < 20)) state.wx = { ...target };
@@ -504,7 +520,7 @@ function render() {
     sun: current.sun, moon: current.moon, moonPhase: current.moonPhase,
     wakes: boats.wakes(),
     trees, season: current.season,
-    stars, boulders, particles, summit, date: current.date, sky: skyFrame(current.date, config.cas.sirka, config.cas.delka),
+    stars, boulders, particles, summit, tourists, date: current.date, sky: skyFrame(current.date, config.cas.sirka, config.cas.delka),
     map: heightMap,
   });
   // Odrazy blízkých stromů a rákosí (vzdálenější odraz už je v obrazu vody), pak balvanů.

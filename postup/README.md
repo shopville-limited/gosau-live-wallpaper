@@ -482,3 +482,9 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Krkonoše: mrak přes hřeben – čepice na Sněžce při silném větru](80-krkonose-mrak-pres-hreben-cepice-na-snez.jpg)
 
+## 81. Krkonoše: pěšiny z OpenStreetMap a turisté na cestě ke Sněžce
+
+*2026-10-02 19:48*
+
+![Krkonoše: pěšiny z OpenStreetMap a turisté na cestě ke Sněžce](81-krkonose-pesiny-z-openstreetmap-a-turist.jpg)
+

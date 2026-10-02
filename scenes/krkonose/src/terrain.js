@@ -236,6 +236,7 @@ uniform vec3 uMossMean;
 uniform sampler2D uGrassColor;  // tráva (CC0, Grass004)
 uniform sampler2D uFloorColor;  // lesní půda (CC0, Ground037)
 uniform sampler2D uGravelColor; // oblázková pláž (CC0, Gravel041)
+uniform sampler2D uPathMap;     // cesty z OSM: vzdálenost k cestě a polovina šířky (m / 25,5)
 uniform vec3 uGrassMean;
 uniform vec3 uFloorMean;
 uniform vec3 uGravelMean;
@@ -462,6 +463,22 @@ Surface surfaceAt(vec3 p, float t) {
   float onBoulder = boulderMask(p.xz);
   grassy *= 1.0 - onBoulder;
   albedo = mix(albedo, alpine, grassy);
+  // Pěšiny (OpenStreetMap): kamenný chodník a udusaná hlína, kolem pás prošlapané trávy.
+  // Vzdálenostní pole v jemné mřížce: ostrý okraj i zblízka, zdálky se cesta zúží pod pixel.
+  vec2 pathUv = ((p.xz - uDetailRect.xy) / uDetailRect.zw * (uDetailSize - 1.0) + 0.5) / uDetailSize;
+  if (all(greaterThan(pathUv, vec2(0.0))) && all(lessThan(pathUv, vec2(1.0)))) {
+    vec2 pf = texture(uPathMap, pathUv).rg * 25.5;
+    if (pf.y > 0.0 && pf.x < pf.y + 3.0) {
+      float aa = 0.35 + footprint * 700.0;
+      float path = 1.0 - smoothstep(pf.y - aa, pf.y + aa, pf.x + 0.4 * (fine - 0.5));
+      float worn = 1.0 - smoothstep(pf.y, pf.y + 1.3 + aa, pf.x);
+      vec3 stones = vec3(0.25, 0.235, 0.21) * textureDetail(uGravelColor, uGravelMean, wp * 1.5, triW, footprint * 1.5);
+      vec3 dirt = vec3(0.16, 0.135, 0.1) * (0.8 + 0.4 * fine);
+      vec3 pathColor = mix(dirt, stones, smoothstep(0.3, 0.7, noise3(wp * 0.15 + 81.0) * 0.5 + 0.5));
+      albedo = mix(albedo, vec3(0.1, 0.09, 0.06) * (0.8 + 0.4 * fine), worn * 0.35);
+      albedo = mix(albedo, pathColor, path);
+    }
+  }
   // Pod skupinkami smrků ve strmém svahu (trees.js, do 1,2 km) tmavá lesní půda s jehličím.
   float slopeTan = sqrt(max(1.0 - slope * slope, 0.0)) / max(slope, 0.05);
   float clingZone = step(0.8, slopeTan) * step(slopeTan, 3.2) * (1.0 - smoothstep(1.2, 1.3, alt))
@@ -847,6 +864,18 @@ export async function loadHeightMap(gl, folder) {
     texture: detailTexture, columns: d.columns, rows: d.rows, left: d.left, near: d.near,
     width: (d.columns - 1) * d.spacing, depth: (d.rows - 1) * d.spacing,
   };
+  // Cesty z OSM (tools/krkonose.mjs): stejná jemná mřížka, RG = vzdálenost k cestě
+  // a polovina šířky (decimetry).
+  const pathBytes = new Uint8Array(await (await fetch(`${folder}/teren-cesty.bin`)).arrayBuffer());
+  const paths = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, paths);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);   // řádek 1201 × 2 bajty není násobek 4
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, d.columns, d.rows, 0, gl.RG, gl.UNSIGNED_BYTE, pathBytes);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.bindTexture(gl.TEXTURE_2D, null);
   // Bilineární čtení mřížky v JS (km).
   const gridSample = (values, cols, rows, left, near, spacing, x, z) => {
     const fx = (x - left) / spacing, fz = (z - near) / spacing;
@@ -860,6 +889,12 @@ export async function loadHeightMap(gl, folder) {
   const sampleFine = (x, z) => (inDetail(x, z)
     ? gridSample(detailData, d.columns, d.rows, d.left, d.near, d.spacing, x, z)
     : gridSample(data, meta.columns, meta.rows, meta.left, meta.near, meta.spacing, x, z));
+  // Kolik metrů od okraje cesty (záporné = na cestě); mimo jemnou mapu daleko.
+  const pathDist = new Float32Array(d.columns * d.rows), pathHalf = new Float32Array(d.columns * d.rows);
+  for (let i = 0; i < pathDist.length; i++) { pathDist[i] = pathBytes[i * 2] / 10; pathHalf[i] = pathBytes[i * 2 + 1] / 10; }
+  const samplePath = (x, z) => (inDetail(x, z)
+    ? gridSample(pathDist, d.columns, d.rows, d.left, d.near, d.spacing, x, z) - gridSample(pathHalf, d.columns, d.rows, d.left, d.near, d.spacing, x, z)
+    : 99);
   const sampleForest = (x, z) => gridSample(forestBytes, meta.columns, meta.rows, meta.left, meta.near, meta.spacing, x, z) / 255;
   // Balvany v popředí (km): x, z, poloměr, výška nad vodou. Kamera vidí hladinu od 80 m.
   const boulderList = [
@@ -989,6 +1024,8 @@ export async function loadHeightMap(gl, folder) {
     sample: (x, z) => (onBoulders(x, z) ? 0.001 : baseSample(x, z)),
     sampleFine,
     sampleForest,
+    samplePath,
+    paths,
     meta,
     columns: meta.columns,
     rows: meta.rows,
@@ -1071,7 +1108,7 @@ export async function createTerrain(gl, map) {
     [[map.textures.rock, 'uRockColor', 7], [map.textures.rockNormal, 'uRockNormal', 8],
      [map.textures.moss, 'uMossColor', 9], [map.textures.mossNormal, 'uMossNormal', 10],
      [map.textures.grass, 'uGrassColor', 11], [map.textures.floor, 'uFloorColor', 12],
-     [map.textures.gravel, 'uGravelColor', 13]].forEach(([t, name, unit]) => {
+     [map.textures.gravel, 'uGravelColor', 13], [{ texture: map.paths }, 'uPathMap', 14]].forEach(([t, name, unit]) => {
       gl.activeTexture(gl.TEXTURE0 + unit);
       gl.bindTexture(gl.TEXTURE_2D, t.texture);
       gl.uniform1i(u[name], unit);

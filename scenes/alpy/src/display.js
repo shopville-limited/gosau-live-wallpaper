@@ -867,7 +867,10 @@ void main() {
         c = mix(c, w.rgb * 0.8, w.a * 0.6 * (1.0 - uIce));
       }
     } else {
-      vec4 w = slopeWisp(rd, sceneDist);
+      // Blízký strom (alfa 0,97): mrak počítat v jeho vzdálenosti, ne podle terénu za ním
+      // (jinak by přes stromy prosvítala hrana hřebene schovaného za nimi).
+      bool tree = scene.a > 0.9 && scene.a < 0.99;
+      vec4 w = slopeWisp(rd, tree ? min(sceneDist, 0.9) : sceneDist);
       c = mix(c, w.rgb, w.a);
     }
   }

@@ -337,12 +337,14 @@ Surface surfaceAt(vec3 p, float t) {
   // drobný reliéf stěn přidává 3D detail níž. (Další volání tripleHeight by se vložilo
   // do shaderu znovu a překlad by trval desítky sekund.)
   float wallW = (1.0 - smoothstep(0.45, 0.8, n.y)) * (1.0 - smoothstep(1.5, 3.0, t));
-  float eps = wallW > 0.5 ? 0.006 : max(0.02, 0.004 * t);
+  // Plynule (skok podle prahu dělal na svazích ostré rovné hrany ve stínování).
+  float wallMix = smoothstep(0.25, 0.75, wallW);
+  float eps = mix(max(0.02, 0.004 * t), 0.006, wallMix);
   vec3 hs = vec3(baseHeight(p.xz), baseHeight(p.xz + vec2(eps, 0.0)), baseHeight(p.xz + vec2(0.0, eps)));
   float hc = hs.x;
   vec3 coarse = normalize(vec3(hs.x - hs.y, eps, hs.x - hs.z));
   float slope = coarse.y;
-  if (wallW > 0.5) n = normalize(mix(n, coarse, smoothstep(0.5, 1.0, wallW)));
+  n = normalize(mix(n, coarse, wallMix));
   float alt = p.y;
   float footprint = t * uFootprint;
   // Šum ve 3D podle polohy v metrech: 2D šum by se na strmých svazích a na kmenech

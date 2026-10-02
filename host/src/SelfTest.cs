@@ -82,7 +82,8 @@ namespace MojeTapeta
                     return false;
                 }
                 bool ready = false;
-                for (int i = 0; i < 100 && !ready; i++)
+                // Po aktualizaci WebView2 se shadery překládají znovu (desítky sekund).
+                for (int i = 0; i < 450 && !ready; i++)
                 {
                     ready = await window.Evaluate("document.documentElement.dataset.ready") == "\"true\"";
                     if (!ready) await Task.Delay(200);

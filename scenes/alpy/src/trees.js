@@ -355,7 +355,8 @@ void main() {
     outColor = vec4(c * alpha, alpha);
     return;
   }
-  outColor = vec4(c, 1.0);
+  // Alfa 0,97 označí v obrazu scény blízký strom (zadní plán za ním může být daleko).
+  outColor = vec4(c, 0.97);
 }`;
 
 // Stín stromu na zemi: protáhlý klín od paty stromu ve směru od slunce.

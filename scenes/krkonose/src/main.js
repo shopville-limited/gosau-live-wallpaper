@@ -33,7 +33,7 @@ const params = new URLSearchParams(location.search);
 const screenIndex = Math.max(0, Number.parseInt(params.get('screen') || '0', 10) || 0);
 // Obrázek z minula, dokud se scéna nepřipraví (jen v tapetě, ne v náhledu s parametry).
 // Verze v klíči: po opravě chyby obrazu se staré (možná rozbité) snímky nepoužijí.
-const snapshotCache = createSnapshotCache(`alpy-v2-obrazovka-${screenIndex}-${innerWidth}x${innerHeight}`);
+const snapshotCache = createSnapshotCache(`krkonose-v1-obrazovka-${screenIndex}-${innerWidth}x${innerHeight}`);
 const cacheAllowed = [...params.keys()].every((k) => k === 'screen');
 
 function randomGenerator(seed) {
@@ -824,7 +824,7 @@ window.sceneCheck = (phase) => {
       // Při „Přehrát den“ se v říjnu a dubnu mění roční období každou hodinu a krajina se
       // právě přepočítává; to je v pořádku (jinak dopočítaná být musí).
       'Krajina je dopočítaná': terrain.materialDone || state.time - (state.seasonAt ?? -100) < 15,
-      'Na jezeře plují loďky': boats.count > 0,
+
       'Kreslí grafická karta, ne procesor': !gpu.software,
       'Hejno ptáků letí (nebo je noc)': birds.count > 0 || current.sun[1] <= 0.02,
       'Fouká vítr': state.gust > 0.1,

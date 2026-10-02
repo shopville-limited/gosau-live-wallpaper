@@ -1,0 +1,46 @@
+{
+  "columns": 1201,
+  "rows": 1281,
+  "detail": {
+    "columns": 1201,
+    "rows": 801,
+    "spacing": 0.005,
+    "left": -3,
+    "near": -0.5
+  },
+  "spacing": 0.05,
+  "left": -30,
+  "near": -4,
+  "lakeLevel": 0,
+  "base": 0,
+  "scale": 0.1,
+  "cameraGround": 1545.5,
+  "camera": {
+    "lat": 50.7278,
+    "lon": 15.7089,
+    "azimuth": 67.36
+  },
+  "places": {
+    "snezka": [
+      0,
+      2.3669
+    ],
+    "lucniBouda": [
+      -1.0836,
+      -0.5482
+    ],
+    "obriBouda": [
+      1.5757,
+      1.3813
+    ],
+    "peceSnezka": [
+      4.2443,
+      -0.1596
+    ],
+    "karpacz": [
+      -3.6387,
+      5.1905
+    ]
+  },
+  "source": "ČÚZK DMR 5G (CC BY 4.0, ags.cuzk.cz); polská strana a dálka Mapzen Terrain Tiles (AWS Open Data)"
+}

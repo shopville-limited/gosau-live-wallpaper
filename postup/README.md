@@ -440,3 +440,9 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Zima: stopy ve sněhu kolem kluziště, led bez odrazu stromů](73-zima-stopy-ve-snehu-kolem-kluziste-led-b.jpg)
 
+## 74. Krkonoše: první verze, výhled ze Studniční hory na Sněžku (DMR 5G)
+
+*2026-10-02 16:00*
+
+![Krkonoše: první verze, výhled ze Studniční hory na Sněžku (DMR 5G)](74-krkonose-prvni-verze-vyhled-ze-studnicni.jpg)
+

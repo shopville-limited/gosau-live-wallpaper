@@ -425,9 +425,12 @@ void main() {
   float a = texelFetch(uDepth, ivec2(gl_FragCoord.xy), 0).a;
   if (a <= 0.0 || a > 900.0) discard;
   float terrain = a - 100.0 * floor(a / 100.0);
-  if (abs(terrain - vDistance) > 0.006 + 0.02 * vDistance) discard;
+  // Jen země těsně u stromu: s větší tolerancí ztmavovaly skvrny i skálu za stromem
+  // (na svazích hranaté tmavé fleky a pruhy).
+  float tolerance = uAmbient > 0.5 ? 0.0015 + 0.004 * vDistance : 0.003 + 0.008 * vDistance;
+  if (abs(terrain - vDistance) > tolerance) discard;
   if (uAmbient > 0.5) {
-    float k = 1.0 - uStrength * (1.0 - smoothstep(0.35, 1.0, length(vLocal)));
+    float k = 1.0 - uStrength * (1.0 - smoothstep(0.2, 1.0, length(vLocal)));
     outColor = vec4(k, k, k, 1.0);
     return;
   }
@@ -547,7 +550,11 @@ export async function createTrees(gl, { map, random }) {
           }
           continue;
         }
-        const onSlope = cling > density ? 1 : 0;
+        // Ve svahu nad ~20° stín od slunce (klín na rovné zemi) nevrhat: protáhl by se v pruhy.
+        const se = 0.004;
+        const sgx = (map.sampleFine(px + se, pz) - map.sampleFine(px - se, pz)) / (2 * se);
+        const sgz = (map.sampleFine(px, pz + se) - map.sampleFine(px, pz - se)) / (2 * se);
+        const onSlope = cling > density || Math.hypot(sgx, sgz) > 0.35 ? 1 : 0;
         // Listnáče (buk, javor) hlavně níž u jezera ve skupinách, modříny roztroušeně.
         const low = ground < 0.25 ? 1 - ground / 0.25 : 0;
         const broad = low * (0.04 + 0.25 * smooth(0.5, 0.8, vnoise(px * 20 + 17, pz * 20 + 23)));
@@ -746,7 +753,7 @@ export async function createTrees(gl, { map, random }) {
         gl.uniform1f(su.uMirror, w.mirror ? 1 : 0);
         gl.uniform3f(su.uSun, ...o.sun);
         gl.uniform1f(su.uAmbient, 1);
-        gl.uniform1f(su.uStrength, 0.55);
+        gl.uniform1f(su.uStrength, 0.35);
         gl.enable(gl.BLEND);
         gl.blendFuncSeparate(gl.ZERO, gl.SRC_COLOR, gl.ZERO, gl.ONE);
         gl.bindVertexArray(shadowVao);

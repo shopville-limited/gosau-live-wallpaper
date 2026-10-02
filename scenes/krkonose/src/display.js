@@ -1009,11 +1009,15 @@ void main() {
   if (fogAmount > 0.01 && sceneDist > 0.15) {
     // Vrstva leží nízko nad hladinou (asi 15 m, za svítání stoupá), jen tam, kde bod
     // scény opravdu je nízko: ne přes stromy a skály na svazích.
-    vec3 Pf = vec3(0.0, CAMERA_HEIGHT, 0.0) + rd * min(sceneDist, 12.0);
+    // Skutečný bod scény (ne useknutý na 12 km): jinak všechny vzdálené pixely v jednom sloupci
+    // sdílely stejné místo mlhy a v dálce vznikaly svislé pruhy jako odlesky na hladině.
+    vec3 Pf = vec3(0.0, CAMERA_HEIGHT, 0.0) + rd * min(sceneDist, 70.0);
     float rise = dawnFog * smoothstep(-0.02, 0.15, uSun.y) * 0.02;
     float layer = exp(-max(Pf.y - 0.85 - rise * 6.0, 0.0) / (0.05 + 0.08 * dawnFog));   // moře mlhy v údolích
     vec2 fq = Pf.xz * 1.6 + vec2(uTime * 0.004, uTime * 0.0015);
     float wisps = smoothstep(0.3, 0.8, texture(uNoise, fq).r * 0.65 + texture(uNoise, fq * 2.9 + 0.3).r * 0.35);
+    // Zdálky jemná kresba cárů zaniká (jinak by se třpytila), zůstane rovnoměrný opar.
+    wisps = mix(0.45, wisps, exp(-sceneDist * 0.15));
     vec3 zenith, horizon;
     palette(uSun.y, zenith, horizon);
     vec3 fogColor = horizon * 0.75 + mix(zenith, horizon, 0.5) * 0.25 + sunLight() * 0.08 + moonLight() * 0.6;

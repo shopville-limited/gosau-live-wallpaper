@@ -224,6 +224,7 @@ canvas.addEventListener('pointermove', (event) => {
   pointer.x = event.clientX;
   pointer.y = state.view[1] - event.clientY;
   pointer.present = true;
+  state.pointerAt = performance.now();
 });
 canvas.addEventListener('pointerleave', () => { pointer.present = false; });
 
@@ -567,6 +568,19 @@ function render() {
 // trvalo minuty): každých 30 ms kousek práce.
 setInterval(() => trees.pump(8), 30);
 
+// Klidový režim: když se nic rychlého neděje, kreslí se jen každý druhý snímek (z 30 na 15).
+// Krajina, mraky a světlo se mění pomalu; plnou frekvenci potřebují jen blízcí ptáci, kurzor,
+// srážky, blesky, padající hvězda, přehrávání dne a dopočítávání krajiny. Šetří grafiku
+// zhruba o polovinu (zátěž roste přímo úměrně počtu snímků).
+function busyNow() {
+  // Vzdálená hejna letí pomalu a jsou malá (15 snímků stačí); plnou frekvenci chtějí jen blízcí
+  // ptáci (hejno těsně u kamery, sova).
+  return birds.flocks.some((f) => f.kind === 'blizko' || f.kind === 'sova') || performance.now() - (state.pointerAt || -1e9) < 3000
+    || state.doneAt === null || state.time - state.doneAt < 3
+    || (state.wx && state.wx.rain > 0.05) || state.snowfall > 0.05 || state.time < state.snowUntil
+    || state.time - state.strikeAt < 3 || state.time - state.meteorAt < 3 || Boolean(clock.play);
+}
+
 function frame(dt) {
   trees.pump(4);
   current = sky(currentDate());
@@ -578,7 +592,8 @@ function frame(dt) {
     steps++;
   }
   if (steps === 8) state.accumulator = 0;
-  render();
+  state.calmSkip = !busyNow() && !state.calmSkip;
+  if (!state.calmSkip) render();
   updateReadout();
 }
 

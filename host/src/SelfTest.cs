@@ -1,4 +1,4 @@
-// Samotest ve skutečném WebView2: vykreslí scénu v okně schovaném za obrázkem plochy,
+﻿// Samotest ve skutečném WebView2: vykreslí scénu v okně schovaném za obrázkem plochy,
 // pošle falešný kurzor, spustí akce z menu a uloží PNG. Plochu přitom nijak nemění.
 // Výsledek zapíše do <složka>\vysledek.txt, návratový kód 0 = v pořádku.
 
@@ -103,6 +103,18 @@ namespace MojeTapeta
                     await Task.Delay(500);
                 }
                 await window.Snapshot(Path.Combine(folder, "01-klid.png"));
+                // MOJETAPETA_TEST_MERENI=40: scéna po dopočítání běží 40 s při 30 snímcích (jako
+                // tapeta na ploše; jiný počet MOJETAPETA_TEST_SNIMKY), aby šla změřit zátěž grafické karty (čítače GPU Engine).
+                int measure;
+                if (int.TryParse(Environment.GetEnvironmentVariable("MOJETAPETA_TEST_MERENI"), out measure) && measure > 0)
+                {
+                    int rate;
+                    if (!int.TryParse(Environment.GetEnvironmentVariable("MOJETAPETA_TEST_SNIMKY"), out rate) || rate <= 0) rate = 30;
+                    window.SetRate(rate);
+                    report.AppendLine("Měření: " + measure + " s při " + rate + " snímcích.");
+                    await Task.Delay(measure * 1000);
+                    window.SetRate(60);
+                }
 
                 // Falešný kurzor: pomalý tah přes spodní část obrazovky.
                 for (int i = 0; i <= 45; i++)

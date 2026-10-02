@@ -40,6 +40,10 @@
     "karpacz": [
       -3.6396,
       4.9744
+    ],
+    "domSlaski": [
+      -0.6545,
+      1.5927
     ]
   },
   "source": "ČÚZK DMR 5G (CC BY 4.0, ags.cuzk.cz); polská strana a dálka Mapzen Terrain Tiles (AWS Open Data)"

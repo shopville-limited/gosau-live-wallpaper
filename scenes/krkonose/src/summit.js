@@ -1,7 +1,9 @@
 // Stavby na vrcholu Sněžky jako malé 3D modely (vzdálenostní funkce):
 //  - polská meteorologická observatoř: tři nad sebou položené „talíře“ na sloupu (1976),
 //  - kaple sv. Vavřince: kruhová dřevěná stavba s kuželovou střechou a lucernou (1681),
-//  - Česká poštovna: nízká dřevěná stavba se šikmou střechou (2007).
+//  - Česká poštovna: nízká dřevěná stavba se šikmou střechou (2007),
+// a Slezský dům (Dom Śląski) v sedle pod Sněžkou: třípodlažní bouda s valbovou střechou
+// (půdorys z OpenStreetMap), večer a před svítáním svítí okna.
 // Kreslí se do obrazu scény po terénu; schovají se za bližší terén podle hloubky G-bufferu.
 // Ze Studniční hory (2,1 km) mají jen desítky pixelů, proto jednoduché tvary a světla.
 
@@ -36,6 +38,8 @@ uniform sampler2D uDepth;   // G-buffer: alfa = vzdálenost terénu (km)
 uniform sampler2D uShadow;
 uniform float uWinter;
 uniform float uRime;
+uniform int uSite;           // 0 = vrchol Sněžky, 1 = Slezský dům
+uniform float uHour;
 out vec4 outColor;
 ${NOISE}
 ${CAMERA}
@@ -57,7 +61,26 @@ float sdCone(vec3 p, float r, float h) {      // kužel: podstava r v y = 0, šp
 
 // Materiál: 1 bílý plech observatoře, 2 okna, 3 šindel / tmavé dřevo, 4 světlé dřevo, 5 kámen
 vec2 U(vec2 a, vec2 b) { return a.x < b.x ? a : b; }
+// Slezský dům: delší osa na jihovýchod (OSM), 30 × 15 m, tři podlaží, valbová střecha.
+vec2 hut(vec3 p) {
+  float c = 0.7071;
+  vec3 q = vec3(c * p.x - c * p.z, p.y, c * p.x + c * p.z);
+  // Zdi sahají pod zem (svah sedla); podlaží po 3 m od y = 0.
+  vec2 r = vec2(sdBox(q - vec3(0.0, 2.5, 0.0), vec3(15.0, 7.5, 7.5)), 4.0);
+  // Valbová střecha: kvádr oříznutý šikmými rovinami ze všech stran.
+  vec3 t = q - vec3(0.0, 10.0, 0.0);
+  float roof = max(max(t.y + abs(t.z) * 0.75 - 5.0, t.y + abs(t.x) * 0.75 - 9.0), -t.y);
+  roof = max(roof, max(abs(t.x) - 15.6, abs(t.z) - 8.1));
+  r = U(r, vec2(roof, 3.0));
+  // Okna: tři řady v podlažích, po 2,5 m.
+  float row = min(min(abs(q.y - 1.6), abs(q.y - 4.6)), abs(q.y - 7.6));
+  float col = abs(fract(max(abs(q.x), abs(q.z)) / 2.5) - 0.5);
+  if (r.x < 0.3 && r.y == 4.0 && row < 0.6 && col < 0.22) r.y = 2.0;
+  return r;
+}
+
 vec2 scene(vec3 p) {
+  if (uSite == 1) return hut(p);
   // Polská observatoř (počátek): sloup a tři talíře, spodní největší.
   vec2 r = vec2(sdCyl(p, 4.0, 13.0), 5.0);
   float discs = min(min(sdCyl(p - vec3(0, 3.0, 0), 11.0, 3.2), sdCyl(p - vec3(0, 7.5, 0), 9.0, 3.0)), sdCyl(p - vec3(0, 11.5, 0), 6.5, 2.8));
@@ -100,8 +123,9 @@ void main() {
   vec3 ro = vec3(dot(rel, east), rel.y, dot(rel, north));
   vec3 dir = vec3(dot(rd, east), rd.y, dot(rd, north));
   // Obalová koule (poloměr 75 m), v ní hledání povrchu.
-  vec3 oc = ro - vec3(-10.0, 8.0, -15.0);
-  float b = dot(oc, dir), disc = b * b - dot(oc, oc) + 75.0 * 75.0;
+  vec3 oc = ro - (uSite == 1 ? vec3(0.0, 6.0, 0.0) : vec3(-10.0, 8.0, -15.0));
+  float rad = uSite == 1 ? 26.0 : 75.0;
+  float b = dot(oc, dir), disc = b * b - dot(oc, oc) + rad * rad;
   if (disc < 0.0) discard;
   float t = max(-b - sqrt(disc), 0.0), tEnd = -b + sqrt(disc);
   float pix = uSpan / uPixels.y;
@@ -134,7 +158,18 @@ void main() {
   if (m == 1.0) c += sunLight() * 0.25 * pow(max(dot(reflect(dir, n), sunL), 0.0), 20.0);
   // Okna observatoře a poštovny v noci svítí.
   float night = 1.0 - smoothstep(-0.06, 0.04, uSun.y);
-  if (m == 2.0) c += vec3(1.0, 0.75, 0.45) * night * 1.5;
+  // Bouda: rozsvíceno večer do půl jedenácté a ráno od šesti, každé okno jinak.
+  float lit = 1.0;
+  if (uSite == 1) {
+    float c45 = 0.7071;
+    vec3 q = vec3(c45 * p.x - c45 * p.z, p.y, c45 * p.x + c45 * p.z);
+    float cell = floor(max(abs(q.x), abs(q.z)) / 2.5) + floor(q.y / 3.0) * 17.0 + (q.x > 0.0 ? 5.0 : 0.0) + (q.z > 0.0 ? 11.0 : 0.0);
+    float h = hash12(vec2(cell, 3.7));
+    float evening = 1.0 - smoothstep(20.5 + 2.0 * h, 21.0 + 2.0 * h, uHour);
+    float morning = smoothstep(5.5 + h, 6.0 + h, uHour) * (1.0 - smoothstep(8.0, 8.5, uHour));
+    lit = step(0.35, h) * max(uHour > 12.0 ? evening : 0.0, morning);
+  }
+  if (m == 2.0) c += vec3(1.0, 0.75, 0.45) * night * 1.5 * lit;
   // Vzduch mezi vrcholem a kamerou.
   float dist = t / 1000.0;
   vec3 transmit = exp(-vec3(0.020, 0.028, 0.042) * dist);
@@ -146,8 +181,12 @@ export async function createSummit(gl, { map }) {
   const program = await createProgramAsync(gl, VS, FS, 'summit');
   const vao = gl.createVertexArray();
   // Vrchol: místo z mapy, zem podle jemné mapy; směry východ/sever podle azimutu kamery.
-  const [px, pz] = map.places.snezka;
-  const ground = map.sampleFine(px, pz);
+  // Stanoviště: vrchol Sněžky a Slezský dům (zem podle jemné mapy, spodek domu u nejnižšího rohu).
+  const sites = [map.places.snezka, map.places.domSlaski].filter(Boolean).map(([x, z], i) => {
+    let ground = map.sampleFine(x, z);
+    if (i === 1) for (const [dx, dz] of [[0.012, 0], [-0.012, 0], [0, 0.012], [0, -0.012]]) ground = Math.min(ground, map.sampleFine(x + dx, z + dz));
+    return [x, ground, z];
+  });
   const az = (map.azimuth * Math.PI) / 180;
   // Svět scény: z = dopředu (azimut), x = doprava. Východ a sever v těchto osách:
   const east = [Math.cos(az), Math.sin(az)], north = [-Math.sin(az), Math.cos(az)];
@@ -166,7 +205,7 @@ export async function createSummit(gl, { map }) {
       gl.uniform2f(u.uSeed, ...w.seed);
       if (u.uOne) gl.uniform1i(u.uOne, 1);
       gl.uniform2f(u.uPixels, o.pixels[0], o.pixels[1]);
-      gl.uniform3f(u.uCenter, px, ground, pz);
+      gl.uniform1f(u.uHour, o.hour ?? 12);
       gl.uniform4f(u.uRot, east[0], east[1], north[0], north[1]);
       gl.uniform1f(u.uTime, o.time);
       gl.uniform3f(u.uSun, ...o.sun);
@@ -177,7 +216,11 @@ export async function createSummit(gl, { map }) {
       gl.uniform1f(u.uWinter, o.season.winter);
       gl.uniform1f(u.uRime, o.rime || 0);
       gl.bindVertexArray(vao);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      sites.forEach((site, i) => {
+        gl.uniform3f(u.uCenter, ...site);
+        gl.uniform1i(u.uSite, i);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      });
       gl.bindVertexArray(null);
     },
   };

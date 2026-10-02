@@ -399,16 +399,20 @@ function snowWanted(now) {
 let current = null;
 
 // Kolik turistů je na hřebeni (0..1): ve dne mezi osmou a šestou, nejvíc v létě a o víkendu,
-// za deště, bouřky a v mracích málo; v noci nikdo.
+// za deště, bouřky a v mracích málo; za svítání a soumraku pár lidí s čelovkami, v noci nikdo.
 function touristShare(now) {
   const hour = now.date.getHours() + now.date.getMinutes() / 60;
   const day = smoothstep01((hour - 7.5) / 1.5) * (1 - smoothstep01((hour - 17.5) / 2)) * smoothstep01((now.sun[1] + 0.02) / 0.1);
+  // Za svítání stoupají lidé na Sněžku na východ slunce, večer sestupují opozdilci (s čelovkami).
+  const sun = now.sun[1];
+  const sunrise = hour < 12 && sun > -0.2 && sun < 0.06 ? 0.3 : 0;
+  const dusk = hour >= 12 && sun > -0.16 && sun < 0.02 ? 0.12 : 0;
   const month = now.date.getMonth();
   const season = [0.35, 0.4, 0.35, 0.3, 0.6, 0.9, 1, 1, 0.9, 0.65, 0.15, 0.3][month];
   const weekend = [0, 6].includes(now.date.getDay()) ? 1 : 0.55;
   const wx = state.wx || {};
   const weather = (1 - Math.min(1, (wx.rain || 0) * 0.85)) * (1 - (wx.storm || 0)) * (1 - (wx.ridge || 0) * 0.4);
-  return day * season * weekend * weather;
+  return Math.max(day, sunrise, dusk) * season * weekend * weather;
 }
 
 // Provozní doba lanovky na Sněžku (snezkalanovka.cz): denně 8–18 h, od května do září do 19 h,

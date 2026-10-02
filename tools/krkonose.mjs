@@ -291,6 +291,7 @@ writeFileSync(join(out, 'teren.json'), JSON.stringify({
     obriBouda: local(50.7195, 15.7356),
     peceSnezka: local(50.6920, 15.7300),
     karpacz: local(50.7760, 15.7570),
+    domSlaski: local(50.7395, 15.7290),
   },
   source: 'ČÚZK DMR 5G (CC BY 4.0, ags.cuzk.cz); polská strana a dálka Mapzen Terrain Tiles (AWS Open Data)',
 }, null, 2));

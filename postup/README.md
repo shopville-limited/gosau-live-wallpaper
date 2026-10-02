@@ -500,3 +500,9 @@ Snímky jednotlivých verzí od nejstarší. Nové přidáte příkazem `host\sn
 
 ![Krkonoše: lanovka na Sněžku podle OSM, jezdí v provozní době](83-krkonose-lanovka-na-snezku-podle-osm-jez.jpg)
 
+## 84. Krkonoše večer: okna Slezského domu, čelovky na cestách, lanovka proti soumraku
+
+*2026-10-02 22:00*
+
+![Krkonoše večer: okna Slezského domu, čelovky na cestách, lanovka proti soumraku](84-krkonose-vecer-okna-slezskeho-domu-celov.jpg)
+

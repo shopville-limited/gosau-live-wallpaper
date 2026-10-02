@@ -52,6 +52,7 @@ in vec3 vWorld;
 uniform vec2 uPixels;
 uniform sampler2D uDepth;   // G-buffer: alfa = vzdálenost terénu (km)
 uniform float uWinter;
+uniform float uLamp;        // tma: z postavy je vidět jen čelovka
 out vec4 outColor;
 ${NOISE}
 ${CAMERA}
@@ -60,8 +61,14 @@ void main() {
   float a = texelFetch(uDepth, ivec2(gl_FragCoord.xy), 0).a;
   float terrain = a - 100.0 * floor(a / 100.0);
   if (a > 0.0 && a < 900.0 && terrain < vDistance - 0.003) discard;
-  // Silueta: hlava, trup s batohem, nohy.
   float y = vLocal.y, x = abs(vLocal.x);
+  // Za tmy: jen světlo čelovky (bílé až nažloutlé), kulatá tečka u hlavy.
+  if (uLamp > 0.5) {
+    if (y < 0.7) discard;
+    outColor = vec4(vec3(2.6, 2.45, 2.1) * (0.7 + 0.3 * vColor), 1.0);
+    return;
+  }
+  // Silueta: hlava, trup s batohem, nohy.
   if (y > 0.88 && x > 0.45) discard;
   // Bunda: červená, modrá, žlutá, zelená, oranžová, šedá (v zimě víc tmavých).
   vec3 jackets[6] = vec3[6](vec3(0.55, 0.06, 0.05), vec3(0.06, 0.16, 0.5), vec3(0.6, 0.45, 0.04),
@@ -204,6 +211,7 @@ export async function createTourists(gl, { map, random, cameraHeight = 1.5088, v
       gl.uniform1f(u.uOvercast, o.overcast || 0);
       gl.uniform1f(u.uFlash, o.flash || 0);
       gl.uniform1f(u.uWinter, o.season.winter);
+      gl.uniform1f(u.uLamp, o.sun[1] < -0.06 ? 1 : 0);
       gl.bindVertexArray(vao);
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, n);
       gl.bindVertexArray(null);

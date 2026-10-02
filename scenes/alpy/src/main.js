@@ -409,6 +409,7 @@ function render() {
   const key = seasonKey(current.season);
   if (key !== state.seasonKey) {
     state.seasonKey = key;
+    state.seasonAt = state.time;
     terrain.setSeason(current.season);
   }
   // Stíny: přepočítat, když se světlo pohnulo o víc než třetinu stupně.
@@ -816,7 +817,9 @@ window.sceneCheck = (phase) => {
   if (phase === 'akce') {
     console.warn(`Po akcích: padajících listů a vloček ${particles.count}`);
     return {
-      'Krajina je dopočítaná': terrain.materialDone,
+      // Při „Přehrát den“ se v říjnu a dubnu mění roční období každou hodinu a krajina se
+      // právě přepočítává; to je v pořádku (jinak dopočítaná být musí).
+      'Krajina je dopočítaná': terrain.materialDone || state.time - (state.seasonAt ?? -100) < 15,
       'Na jezeře plují loďky': boats.count > 0,
       'Kreslí grafická karta, ne procesor': !gpu.software,
       'Hejno ptáků letí (nebo je noc)': birds.count > 0 || current.sun[1] <= 0.02,
